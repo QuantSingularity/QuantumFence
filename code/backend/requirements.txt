@@ -1,0 +1,50 @@
+# QuantumFence - Python Dependencies
+
+# ─── Web Framework ────────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+
+# ─── Database ────────────────────────────────────────────────────────────────
+sqlalchemy==2.0.31
+alembic==1.13.2
+
+# ─── Auth ────────────────────────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+pydantic-settings==2.3.4
+pydantic[email]==2.8.2
+
+# ─── AI / ML ─────────────────────────────────────────────────────────────────
+anthropic==0.31.1
+ultralytics==8.2.52
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+Pillow==10.4.0
+torch==2.3.1
+torchvision==0.18.1
+
+# ─── Async ───────────────────────────────────────────────────────────────────
+aiofiles==23.2.1
+aiohttp==3.9.5
+websockets==12.0
+httpx==0.27.0
+
+# ─── Geospatial ───────────────────────────────────────────────────────────────
+shapely==2.0.5
+pyproj==3.6.1
+geopy==2.4.1
+
+# ─── Notifications ───────────────────────────────────────────────────────────
+aiosmtplib==3.0.2
+
+# ─── Utilities ───────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+loguru==0.7.2
+rich==13.7.1
+typer==0.12.3
+schedule==1.2.2
+
+# ─── Monitoring ──────────────────────────────────────────────────────────────
+prometheus-fastapi-instrumentator==7.0.0
+psutil==6.0.0

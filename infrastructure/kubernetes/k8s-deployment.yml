@@ -1,0 +1,246 @@
+# QuantumFence — Kubernetes Deployment Manifests
+# Apply with: kubectl apply -f k8s-deployment.yml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quantumfence
+  labels:
+    app: quantumfence
+
+---
+# ─── ConfigMap ───────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qf-config
+  namespace: quantumfence
+data:
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  DEBUG: "false"
+  DETECTION_CONFIDENCE: "0.65"
+  FRAME_SKIP: "3"
+  MAX_CAMERAS: "64"
+
+---
+# ─── Secret ──────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Secret
+metadata:
+  name: qf-secrets
+  namespace: quantumfence
+type: Opaque
+stringData:
+  SECRET_KEY: "change-this-in-production"
+  ANTHROPIC_API_KEY: ""
+  GOOGLE_MAPS_API_KEY: ""
+  DATABASE_URL: "postgresql://qfuser:qfpass@qf-postgres:5432/quantumfence"
+
+---
+# ─── Backend Deployment ──────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qf-backend
+  namespace: quantumfence
+  labels:
+    app: qf-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: qf-backend
+  template:
+    metadata:
+      labels:
+        app: qf-backend
+    spec:
+      containers:
+        - name: qf-backend
+          image: quantumfence/backend:1.0.0
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: qf-config
+            - secretRef:
+                name: qf-secrets
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - name: snapshots
+              mountPath: /app/snapshots
+            - name: models
+              mountPath: /app/ai_models/weights
+      volumes:
+        - name: snapshots
+          persistentVolumeClaim:
+            claimName: qf-snapshots-pvc
+        - name: models
+          persistentVolumeClaim:
+            claimName: qf-models-pvc
+
+---
+# ─── Backend Service ─────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: qf-backend-svc
+  namespace: quantumfence
+spec:
+  selector:
+    app: qf-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+
+---
+# ─── Frontend Deployment ─────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qf-frontend
+  namespace: quantumfence
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: qf-frontend
+  template:
+    metadata:
+      labels:
+        app: qf-frontend
+    spec:
+      containers:
+        - name: qf-frontend
+          image: quantumfence/frontend:1.0.0
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+---
+# ─── Frontend Service ────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: qf-frontend-svc
+  namespace: quantumfence
+spec:
+  selector:
+    app: qf-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+
+---
+# ─── Ingress ─────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qf-ingress
+  namespace: quantumfence
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: quantumfence.yourdomain.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: qf-backend-svc
+                port:
+                  number: 8000
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: qf-backend-svc
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: qf-frontend-svc
+                port:
+                  number: 80
+
+---
+# ─── Persistent Volume Claims ────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qf-snapshots-pvc
+  namespace: quantumfence
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qf-models-pvc
+  namespace: quantumfence
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# ─── HorizontalPodAutoscaler ─────────────────────────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: qf-backend-hpa
+  namespace: quantumfence
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: qf-backend
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

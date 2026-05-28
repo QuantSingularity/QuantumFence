@@ -1,0 +1,63 @@
+# QuantumFence .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Environment
+.env
+!.env.example
+*.env.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# AI Model Weights (large binary files)
+code/ai_models/weights/*.pt
+code/ai_models/weights/*.onnx
+code/ai_models/weights/*.tflite
+
+# Snapshots & Recordings
+code/backend/snapshots/
+code/backend/recordings/
+code/backend/logs/
+
+# Node
+node_modules/
+web-frontend/dist/
+web-frontend/.vite/
+
+# Docker
+infrastructure/docker/.env
+
+# Terraform
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/.terraform.lock.hcl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# SSL
+infrastructure/nginx/ssl/
+*.pem
+*.key
+*.crt

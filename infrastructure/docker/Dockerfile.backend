@@ -1,0 +1,56 @@
+# QuantumFence — Backend Dockerfile
+# Multi-stage build for optimized production image
+
+# ─── Stage 1: Builder ────────────────────────────────────────────────────────
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+# Install build deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libpq-dev curl libgl1-mesa-glx libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# ─── Stage 2: Runtime ────────────────────────────────────────────────────────
+FROM python:3.11-slim AS runtime
+
+LABEL maintainer="QuantumFence Team"
+LABEL version="1.0.0"
+LABEL description="QuantumFence AI-Powered Perimeter Defense Backend"
+
+# Runtime libs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 libgl1-mesa-glx libglib2.0-0 curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r qfuser && useradd -r -g qfuser -s /sbin/nologin qfuser
+
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
+
+WORKDIR /app
+
+# Copy application code
+COPY . .
+
+# Create required directories
+RUN mkdir -p snapshots recordings logs ai_models/weights && \
+    chown -R qfuser:qfuser /app
+
+# Switch to non-root
+USER qfuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--workers", "4", "--log-level", "info", \
+     "--access-log", "--no-use-colors"]

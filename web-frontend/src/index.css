@@ -1,0 +1,399 @@
+/* QuantumFence — Global Design System */
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap");
+
+:root {
+  /* Core Palette */
+  --qf-bg-deep: #020408;
+  --qf-bg-dark: #060d14;
+  --qf-bg-card: #0a1628;
+  --qf-bg-surface: #0d1f35;
+  --qf-bg-hover: #122540;
+
+  /* Accent Colors */
+  --qf-cyan: #00d4ff;
+  --qf-cyan-dim: #00d4ff44;
+  --qf-cyan-glow: #00d4ff22;
+  --qf-green: #00ff88;
+  --qf-green-dim: #00ff8833;
+  --qf-orange: #ff6b35;
+  --qf-red: #ff2d55;
+  --qf-red-dim: #ff2d5533;
+  --qf-yellow: #ffd60a;
+  --qf-purple: #bf5af2;
+
+  /* Text */
+  --qf-text-primary: #e8f4f8;
+  --qf-text-secondary: #7a9bb5;
+  --qf-text-muted: #3d5a72;
+  --qf-text-accent: #00d4ff;
+
+  /* Borders */
+  --qf-border: #1a3a5c;
+  --qf-border-glow: #00d4ff44;
+
+  /* Severity */
+  --sev-critical: #ff2d55;
+  --sev-high: #ff6b35;
+  --sev-medium: #ffd60a;
+  --sev-low: #00ff88;
+
+  /* Fonts */
+  --font-display: "Orbitron", monospace;
+  --font-mono: "Share Tech Mono", monospace;
+  --font-body: "Inter", sans-serif;
+
+  /* Spacing */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--qf-bg-deep);
+  color: var(--qf-text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--qf-bg-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--qf-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--qf-cyan-dim);
+}
+
+/* ── Grid Noise Texture ────────────────────────────────────────────────────── */
+.qf-grid-bg {
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── Glow Effects ──────────────────────────────────────────────────────────── */
+.glow-cyan {
+  box-shadow:
+    0 0 20px var(--qf-cyan-dim),
+    0 0 60px var(--qf-cyan-glow);
+}
+.glow-green {
+  box-shadow:
+    0 0 20px var(--qf-green-dim),
+    0 0 40px #00ff8811;
+}
+.glow-red {
+  box-shadow:
+    0 0 20px var(--qf-red-dim),
+    0 0 40px #ff2d5511;
+}
+.text-glow {
+  text-shadow:
+    0 0 20px var(--qf-cyan),
+    0 0 40px var(--qf-cyan-dim);
+}
+
+/* ── Cards ─────────────────────────────────────────────────────────────────── */
+.qf-card {
+  background: var(--qf-bg-card);
+  border: 1px solid var(--qf-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition:
+    border-color 0.3s,
+    box-shadow 0.3s;
+}
+.qf-card:hover {
+  border-color: var(--qf-border-glow);
+  box-shadow: 0 0 30px var(--qf-cyan-glow);
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
+.qf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 1px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+.qf-btn-primary {
+  background: var(--qf-cyan);
+  color: var(--qf-bg-deep);
+  font-weight: 700;
+}
+.qf-btn-primary:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 0 20px var(--qf-cyan-dim);
+}
+.qf-btn-outline {
+  background: transparent;
+  border-color: var(--qf-border);
+  color: var(--qf-text-primary);
+}
+.qf-btn-outline:hover {
+  border-color: var(--qf-cyan);
+  color: var(--qf-cyan);
+}
+.qf-btn-danger {
+  background: var(--qf-red);
+  color: white;
+  font-weight: 700;
+}
+.qf-btn-danger:hover {
+  filter: brightness(1.15);
+}
+
+/* ── Status Indicators ─────────────────────────────────────────────────────── */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-online {
+  background: var(--qf-green);
+  box-shadow: 0 0 8px var(--qf-green);
+  animation: pulse-green 2s infinite;
+}
+.status-offline {
+  background: var(--qf-text-muted);
+}
+.status-error {
+  background: var(--qf-red);
+  box-shadow: 0 0 8px var(--qf-red);
+  animation: pulse-red 1s infinite;
+}
+
+/* ── Severity Badges ───────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.badge-critical {
+  background: #ff2d5522;
+  color: var(--sev-critical);
+  border: 1px solid #ff2d5544;
+}
+.badge-high {
+  background: #ff6b3522;
+  color: var(--sev-high);
+  border: 1px solid #ff6b3544;
+}
+.badge-medium {
+  background: #ffd60a22;
+  color: var(--sev-medium);
+  border: 1px solid #ffd60a44;
+}
+.badge-low {
+  background: #00ff8822;
+  color: var(--sev-low);
+  border: 1px solid #00ff8844;
+}
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+@keyframes pulse-green {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 8px var(--qf-green);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 16px var(--qf-green);
+  }
+}
+@keyframes pulse-red {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+@keyframes scan-line {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes flicker {
+  0%,
+  95%,
+  100% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.8;
+  }
+  97% {
+    opacity: 1;
+  }
+  98% {
+    opacity: 0.7;
+  }
+}
+@keyframes rotate-ring {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes data-stream {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-in-up 0.4s ease forwards;
+}
+.animate-slide-right {
+  animation: slide-in-right 0.3s ease forwards;
+}
+.animate-flicker {
+  animation: flicker 8s infinite;
+}
+
+/* ── Inputs ────────────────────────────────────────────────────────────────── */
+.qf-input {
+  background: var(--qf-bg-surface);
+  border: 1px solid var(--qf-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  color: var(--qf-text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+.qf-input:focus {
+  outline: none;
+  border-color: var(--qf-cyan);
+  box-shadow: 0 0 10px var(--qf-cyan-glow);
+}
+.qf-input::placeholder {
+  color: var(--qf-text-muted);
+}
+
+.qf-select {
+  background: var(--qf-bg-surface);
+  border: 1px solid var(--qf-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  color: var(--qf-text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  cursor: pointer;
+}
+.qf-select:focus {
+  outline: none;
+  border-color: var(--qf-cyan);
+}
+
+/* ── Tables ────────────────────────────────────────────────────────────────── */
+.qf-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.qf-table th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--qf-text-muted);
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--qf-border);
+}
+.qf-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #0d1f3522;
+  font-size: 13px;
+  color: var(--qf-text-primary);
+}
+.qf-table tr:hover td {
+  background: var(--qf-bg-hover);
+}
+
+/* ── Misc ──────────────────────────────────────────────────────────────────── */
+.scan-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+  opacity: 0.03;
+}
+.scan-overlay::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 4px;
+  background: var(--qf-cyan);
+  animation: scan-line 6s linear infinite;
+}

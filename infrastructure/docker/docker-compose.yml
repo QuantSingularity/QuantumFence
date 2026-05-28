@@ -1,0 +1,153 @@
+version: "3.9"
+
+services:
+  # ─── Backend API ─────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ../../code/backend
+      dockerfile: ../../infrastructure/docker/Dockerfile.backend
+    container_name: qf-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://qfuser:qfpass@db:5432/quantumfence
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key-in-production}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      - DEBUG=${DEBUG:-false}
+      - HOST=0.0.0.0
+      - PORT=8000
+    volumes:
+      - qf-snapshots:/app/snapshots
+      - qf-recordings:/app/recordings
+      - qf-models:/app/ai_models/weights
+      - qf-logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - qf-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Frontend ─────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../../web-frontend
+      dockerfile: ../infrastructure/docker/Dockerfile.frontend
+      args:
+        - VITE_API_URL=/api
+        - VITE_WS_URL=ws://localhost/ws
+    container_name: qf-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - qf-ssl:/etc/ssl/quantumfence:ro
+    depends_on:
+      - backend
+    networks:
+      - qf-network
+
+  # ─── PostgreSQL Database ──────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: qf-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=quantumfence
+      - POSTGRES_USER=qfuser
+      - POSTGRES_PASSWORD=qfpass
+    volumes:
+      - qf-pgdata:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - qf-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qfuser -d quantumfence"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis (WebSocket pub/sub + task queue) ───────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: qf-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-qfredis}
+    volumes:
+      - qf-redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - qf-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ─── Prometheus Monitoring ────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: qf-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - qf-prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - qf-network
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+
+  # ─── Grafana Dashboard ────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: qf-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-qfgrafana}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    volumes:
+      - qf-grafana-data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - qf-network
+
+# ─── Named Volumes ──────────────────────────────────────────────────────────────
+volumes:
+  qf-pgdata:
+  qf-redis-data:
+  qf-snapshots:
+  qf-recordings:
+  qf-models:
+  qf-logs:
+  qf-ssl:
+  qf-prometheus-data:
+  qf-grafana-data:
+
+# ─── Networks ────────────────────────────────────────────────────────────────────
+networks:
+  qf-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
