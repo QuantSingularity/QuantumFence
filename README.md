@@ -1,4 +1,4 @@
-# ⚡ QuantumFence
+# QuantumFence
 
 ### Quantum-Accelerated Perimeter Defense AI System
 
@@ -6,7 +6,7 @@
 
 ---
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 QuantumFence/
@@ -80,7 +80,7 @@ QuantumFence/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Prerequisites
 
@@ -91,8 +91,8 @@ QuantumFence/
 ### 2. Install
 
 ```bash
-git clone https://github.com/your-org/quantumfence.git
-cd quantumfence
+git clone https://github.com/quantsingularity/QuantumFence
+cd QuantumFence
 bash scripts/setup/setup.sh --dev
 ```
 
@@ -126,7 +126,7 @@ Access:
 
 ---
 
-## 🐳 Docker Deployment
+## Docker Deployment
 
 ```bash
 cd infrastructure/docker
@@ -136,9 +136,9 @@ docker-compose up -d
 
 ---
 
-## ✨ Features
+## Features
 
-### 🎥 Camera Management
+### Camera Management
 
 - Add unlimited IP/RTSP/USB/HTTP-MJPEG cameras
 - Per-camera detection configuration
@@ -146,7 +146,7 @@ docker-compose up -d
 - Night vision tagging
 - Live status dashboard with WebSocket updates
 
-### 🤖 AI Detection (YOLOv8)
+### AI Detection (YOLOv8)
 
 - **Person detection** near fence perimeter
 - **Vehicle detection** (cars, trucks, motorcycles, buses)
@@ -155,7 +155,7 @@ docker-compose up -d
 - Swarm detection (multiple drones coordinating)
 - Confidence-based alert filtering
 
-### 🧠 Claude AI Threat Analysis
+### Claude AI Threat Analysis
 
 - Natural language threat summaries for operators
 - Risk scoring (0.0–1.0) per detection
@@ -163,7 +163,7 @@ docker-compose up -d
 - Drone purpose classification (surveillance/recreational/hostile)
 - Multi-threat coordination detection
 
-### 🗺️ Geospatial Intelligence
+### Geospatial Intelligence
 
 - Google Maps / OpenStreetMap satellite view
 - KML export for Google Earth Pro
@@ -172,7 +172,7 @@ docker-compose up -d
 - Threat heatmap overlay
 - Real-world location estimation from bounding box
 
-### 🛸 Drone Watch
+### Drone Watch
 
 - Animated radar display
 - Live trajectory analysis
@@ -180,21 +180,21 @@ docker-compose up -d
 - Authorized vs. unauthorized classification
 - Loitering detection
 
-### 📊 Analytics
+### Analytics
 
 - Detection timeline charts
 - Alert distribution by type
 - Camera performance metrics
 - 24h / 7d / 30d trend analysis
 
-### 🔔 Notifications
+### Notifications
 
 - HTML email alerts with snapshot attachments
 - Webhook integration (Slack, Teams, custom)
 - Severity-based escalation
 - Alert cooldown management
 
-### 🔐 Security
+### Security
 
 - JWT authentication with refresh tokens
 - Role-based access (Admin / Operator / Viewer)
@@ -202,7 +202,7 @@ docker-compose up -d
 
 ---
 
-## 🌐 API Reference
+## API Reference
 
 Full Swagger docs at: `http://localhost:8000/api/docs`
 
@@ -220,7 +220,7 @@ Full Swagger docs at: `http://localhost:8000/api/docs`
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 Key settings in `code/backend/.env`:
 
@@ -236,7 +236,7 @@ Key settings in `code/backend/.env`:
 
 ---
 
-## 📡 WebSocket Events
+## WebSocket Events
 
 Connect to `ws://localhost:8000/ws/{client_id}` for live events:
 
@@ -249,7 +249,7 @@ Connect to `ws://localhost:8000/ws/{client_id}` for live events:
 
 ---
 
-## 🏭 Production Deployment
+## Production Deployment
 
 ### Docker Compose (Recommended)
 
@@ -270,6 +270,6 @@ terraform init && terraform plan && terraform apply
 
 ---
 
-## 📄 License
+## License
 
-MIT License — QuantumFence Team © 2025
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
