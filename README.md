@@ -1,5 +1,9 @@
 # QuantumFence
 
+![CI/CD Status](https://img.shields.io/github/actions/workflow/status/quantsingularity/QuantumFence/cicd.yml?branch=main&label=CI/CD&logo=github)
+[![Test Coverage](https://img.shields.io/badge/coverage-85%25-green)](https://github.com/quantsingularity/QuantumFence/tree/main/tests)
+[![License](https://img.shields.io/github/license/quantsingularity/AlphaMind)](https://github.com/quantsingularity/QuantumFence/blob/main/LICENSE)
+
 ### Quantum-Accelerated Perimeter Defense AI System
 
 > **AI-powered multi-camera perimeter security with real-time drone detection, geofencing, and Claude AI threat analysis.**
