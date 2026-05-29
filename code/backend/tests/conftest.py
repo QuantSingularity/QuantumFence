@@ -1,13 +1,12 @@
 """
-QuantumFence — Central Test Configuration & Shared Fixtures
+QuantumFence — Backend Test Configuration & Shared Fixtures
+Located at: code/backend/tests/conftest.py
 
-Bug fixes in conftest:
-  - FIX-37: sys.path now inserts BOTH code/ and code/backend/ so all imports resolve.
-  - FIX-38: Settings overrides applied via monkeypatch-equivalent os.environ
-            BEFORE any local module is imported.
-  - FIX-39: db_session fixture uses NullPool instead of StaticPool for
-            connection-level transactions so rollback actually works in tests.
-  - FIX-40: client fixture uses anyio backend setting for pytest-asyncio compat.
+Path resolution:
+  - This file lives in code/backend/tests/
+  - code/backend/ is its parent  → contains all backend packages
+  - code/           is grandparent → contains ai_models, integrations
+  Both are added to sys.path so every import resolves correctly.
 """
 
 import asyncio
@@ -17,17 +16,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-# ── Path setup — MUST happen before any QuantumFence imports ─────────────────
-_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
-_CODE_DIR = os.path.dirname(_TESTS_DIR)
-_BACKEND_DIR = os.path.join(_CODE_DIR, "backend")
+# ── Path setup ────────────────────────────────────────────────────────────────
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))  # code/backend/tests
+_BACKEND_DIR = os.path.dirname(_THIS_DIR)  # code/backend
+_CODE_DIR = os.path.dirname(_BACKEND_DIR)  # code
 
-for _p in (_CODE_DIR, _BACKEND_DIR):
+for _p in (_BACKEND_DIR, _CODE_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
 # ── Override env vars BEFORE importing settings ───────────────────────────────
-# FIX-38: Use os.environ so pydantic-settings picks them up
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
 os.environ.setdefault("ANTHROPIC_API_KEY", "")
@@ -36,7 +34,7 @@ os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("SNAPSHOTS_DIR", "/tmp/qf_test_snaps")
 os.environ.setdefault("RECORDINGS_DIR", "/tmp/qf_test_recordings")
 os.environ.setdefault("THREAT_ANALYSIS_ENABLED", "false")
-os.environ.setdefault("TOUCH_CAMERA_INTERVAL_SECONDS", "9999")  # disable in tests
+os.environ.setdefault("TOUCH_CAMERA_INTERVAL_SECONDS", "9999")
 
 from api.routes.auth import create_access_token, hash_password
 from database.database import Base, get_db
@@ -66,11 +64,6 @@ from sqlalchemy.pool import StaticPool
 
 @pytest.fixture(scope="session")
 def test_engine():
-    """
-    Session-scoped in-memory SQLite engine.
-    FIX-39: StaticPool required for in-memory SQLite so all connections
-    share the same DB instance. PRAGMA foreign_keys enabled per connection.
-    """
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -90,19 +83,13 @@ def test_engine():
 
 @pytest.fixture(scope="function")
 def db_session(test_engine):
-    """
-    Function-scoped session with SAVEPOINT-based isolation so each test
-    is fully rolled back without needing to recreate the schema.
-    """
+    """SAVEPOINT-based isolation — every test fully rolled back."""
     conn = test_engine.connect()
     trans = conn.begin()
-    # Nested (SAVEPOINT) transaction — rolled back after each test
     nested = conn.begin_nested()
-    TestSession = sessionmaker(bind=conn, autoflush=False)
-    session = TestSession()
+    Session = sessionmaker(bind=conn, autoflush=False)
+    session = Session()
 
-    # Re-issue SAVEPOINT on each commit so cascading commits don't commit to
-    # the outer transaction.
     @event.listens_for(session, "after_transaction_end")
     def restart_savepoint(sess, transaction):
         if transaction.nested and not transaction._parent.nested:
@@ -294,10 +281,6 @@ def make_drone_detection(db_session, make_camera):
 
 @pytest.fixture(scope="function")
 def client(db_session):
-    """
-    FIX-40: TestClient with raise_server_exceptions=True and a fully stubbed
-    DetectionService so no background camera loops start during tests.
-    """
     from main import app
 
     def override_get_db():
@@ -319,7 +302,7 @@ def client(db_session):
     app.dependency_overrides.clear()
 
 
-# ── Auth fixtures ─────────────────────────────────────────────────────────────
+# ── Auth helpers ──────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -380,7 +363,7 @@ def noise_frame():
     return (rng.random((720, 1280, 3)) * 255).astype(np.uint8)
 
 
-# ── pytest-asyncio event loop ─────────────────────────────────────────────────
+# ── Event loop ────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture(scope="session")
