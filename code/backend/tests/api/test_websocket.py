@@ -2,10 +2,11 @@
 Tests for the WebSocket ConnectionManager (api/websocket.py).
 All WebSocket objects are mocked — no real network needed.
 """
-import pytest
-import json
-from unittest.mock import AsyncMock, MagicMock, patch, call
 
+import json
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from api.websocket import ConnectionManager
 
 pytestmark = pytest.mark.unit
@@ -13,11 +14,12 @@ pytestmark = pytest.mark.unit
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
+
 def make_ws():
     """Return a mock WebSocket object."""
     ws = MagicMock()
-    ws.accept      = AsyncMock()
-    ws.send_text   = AsyncMock()
+    ws.accept = AsyncMock()
+    ws.send_text = AsyncMock()
     ws.receive_json = AsyncMock()
     return ws
 
@@ -28,6 +30,7 @@ def mgr():
 
 
 # ─── connect / disconnect ────────────────────────────────────────────────────
+
 
 class TestConnectDisconnect:
 
@@ -49,7 +52,7 @@ class TestConnectDisconnect:
         await mgr.connect(ws, "client_1")
         ws.send_text.assert_called_once()
         payload = json.loads(ws.send_text.call_args[0][0])
-        assert payload["type"]      == "connected"
+        assert payload["type"] == "connected"
         assert payload["client_id"] == "client_1"
 
     @pytest.mark.asyncio
@@ -61,7 +64,7 @@ class TestConnectDisconnect:
 
     def test_disconnect_unknown_client_is_safe(self, mgr):
         ws = make_ws()
-        mgr.disconnect(ws, "ghost")   # Should not raise
+        mgr.disconnect(ws, "ghost")  # Should not raise
 
     @pytest.mark.asyncio
     async def test_multiple_clients_connect(self, mgr):
@@ -81,6 +84,7 @@ class TestConnectDisconnect:
 
 
 # ─── Camera subscriptions ────────────────────────────────────────────────────
+
 
 class TestCameraSubscriptions:
 
@@ -106,10 +110,11 @@ class TestCameraSubscriptions:
         assert "c1" not in mgr.camera_subscribers.get("cam_3", set())
 
     def test_unsubscribe_nonexistent_is_safe(self, mgr):
-        mgr.unsubscribe_camera("nobody", "nocam")   # no raise
+        mgr.unsubscribe_camera("nobody", "nocam")  # no raise
 
 
 # ─── Broadcast ───────────────────────────────────────────────────────────────
+
 
 class TestBroadcast:
 
@@ -135,31 +140,32 @@ class TestBroadcast:
         msg = {"type": "alert", "data": {"severity": "critical"}}
         await mgr.broadcast(msg)
 
-        raw     = ws.send_text.call_args[0][0]
+        raw = ws.send_text.call_args[0][0]
         decoded = json.loads(raw)
-        assert decoded["type"]          == "alert"
+        assert decoded["type"] == "alert"
         assert decoded["data"]["severity"] == "critical"
 
     @pytest.mark.asyncio
     async def test_broadcast_removes_broken_connections(self, mgr):
         ws_good = make_ws()
-        ws_bad  = make_ws()
+        ws_bad = make_ws()
         ws_bad.send_text.side_effect = Exception("connection lost")
 
         await mgr.connect(ws_good, "good")
-        mgr.active_connections["bad"] = ws_bad   # inject directly
+        mgr.active_connections["bad"] = ws_bad  # inject directly
 
         await mgr.broadcast({"type": "test"})
 
-        assert "bad"  not in mgr.active_connections
-        assert "good" in    mgr.active_connections
+        assert "bad" not in mgr.active_connections
+        assert "good" in mgr.active_connections
 
     @pytest.mark.asyncio
     async def test_broadcast_empty_connections_is_safe(self, mgr):
-        await mgr.broadcast({"type": "empty"})   # no raise
+        await mgr.broadcast({"type": "empty"})  # no raise
 
 
 # ─── Typed broadcast helpers ─────────────────────────────────────────────────
+
 
 class TestTypedBroadcasts:
 
@@ -171,9 +177,9 @@ class TestTypedBroadcasts:
 
         await mgr.broadcast_alert({"id": 7, "severity": "high"})
 
-        raw     = ws.send_text.call_args[0][0]
+        raw = ws.send_text.call_args[0][0]
         decoded = json.loads(raw)
-        assert decoded["type"]     == "alert"
+        assert decoded["type"] == "alert"
         assert decoded["data"]["id"] == 7
 
     @pytest.mark.asyncio
@@ -196,9 +202,9 @@ class TestTypedBroadcasts:
         await mgr.broadcast_camera_status("cam_2", "online")
 
         decoded = json.loads(ws.send_text.call_args[0][0])
-        assert decoded["type"]      == "camera_status"
+        assert decoded["type"] == "camera_status"
         assert decoded["camera_id"] == "cam_2"
-        assert decoded["status"]    == "online"
+        assert decoded["status"] == "online"
 
     @pytest.mark.asyncio
     async def test_broadcast_drone_detection(self, mgr):
@@ -209,19 +215,20 @@ class TestTypedBroadcasts:
         await mgr.broadcast_drone_detection({"camera_id": 2, "confidence": 0.91})
 
         decoded = json.loads(ws.send_text.call_args[0][0])
-        assert decoded["type"]              == "drone_detection"
+        assert decoded["type"] == "drone_detection"
         assert decoded["data"]["camera_id"] == 2
 
 
 # ─── Camera-subscriber broadcast ─────────────────────────────────────────────
 
+
 class TestBroadcastToCameraSubscribers:
 
     @pytest.mark.asyncio
     async def test_only_subscribers_receive_message(self, mgr):
-        ws_sub  = make_ws()
+        ws_sub = make_ws()
         ws_other = make_ws()
-        await mgr.connect(ws_sub,   "sub")
+        await mgr.connect(ws_sub, "sub")
         await mgr.connect(ws_other, "other")
         mgr.subscribe_camera("sub", "cam_1")
         ws_sub.send_text.reset_mock()

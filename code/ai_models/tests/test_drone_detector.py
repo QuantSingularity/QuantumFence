@@ -3,18 +3,19 @@ Tests for DroneDetector and DroneTrack (ai_models/drone_detector.py).
 Covers multi-object tracking, threat scoring, swarm detection,
 trajectory analysis, and authorised-zone logic.
 """
-import pytest
-import math
-import numpy as np
-from datetime import datetime, timedelta
-from unittest.mock import patch
 
+import math
+from datetime import datetime, timedelta
+
+import numpy as np
+import pytest
 from ai_models.drone_detector import DroneDetector, DroneTrack
 
 pytestmark = pytest.mark.unit
 
 
 # ─── DroneTrack ───────────────────────────────────────────────────────────────
+
 
 class TestDroneTrack:
 
@@ -37,8 +38,8 @@ class TestDroneTrack:
 
     def test_speed_is_euclidean_magnitude(self):
         t = DroneTrack(track_id=1)
-        t.positions.append((0,   0, 30, 30))
-        t.positions.append((3,   4, 30, 30))  # 3-4-5 triangle
+        t.positions.append((0, 0, 30, 30))
+        t.positions.append((3, 4, 30, 30))  # 3-4-5 triangle
         assert t.speed == pytest.approx(5.0)
 
     def test_trajectory_direction_east(self):
@@ -76,9 +77,19 @@ class TestDroneTrack:
         t.positions.append((100, 200, 30, 30))
         t.confidences.append(0.88)
         d = t.to_dict()
-        for key in ["track_id", "current_position", "trajectory", "speed",
-                    "direction", "is_approaching", "drone_type", "is_authorized",
-                    "threat_score", "duration_seconds", "avg_confidence"]:
+        for key in [
+            "track_id",
+            "current_position",
+            "trajectory",
+            "speed",
+            "direction",
+            "is_approaching",
+            "drone_type",
+            "is_authorized",
+            "threat_score",
+            "duration_seconds",
+            "avg_confidence",
+        ]:
             assert key in d, f"Missing key: {key}"
 
     def test_to_dict_track_id_matches(self):
@@ -109,6 +120,7 @@ class TestDroneTrack:
 
 # ─── DroneDetector — tracking ─────────────────────────────────────────────────
 
+
 class TestDroneDetectorTracking:
 
     @pytest.fixture
@@ -137,7 +149,7 @@ class TestDroneDetectorTracking:
         self, detector, frame_1080p
     ):
         dets = [
-            {"confidence": 0.90, "bbox": [100,  100, 40, 40], "class": "drone"},
+            {"confidence": 0.90, "bbox": [100, 100, 40, 40], "class": "drone"},
             {"confidence": 0.85, "bbox": [1600, 800, 40, 40], "class": "drone"},
         ]
         tracks = detector.process_frame(frame_1080p, dets)
@@ -166,13 +178,14 @@ class TestDroneDetectorTracking:
     def test_track_ids_increment(self, detector, frame_1080p):
         det1 = [{"confidence": 0.90, "bbox": [100, 100, 40, 40], "class": "drone"}]
         det2 = [{"confidence": 0.88, "bbox": [1600, 800, 40, 40], "class": "drone"}]
-        tracks1 = detector.process_frame(frame_1080p, det1)
+        detector.process_frame(frame_1080p, det1)
         tracks2 = detector.process_frame(frame_1080p, det1 + det2)
         ids = {t.track_id for t in tracks2}
         assert len(ids) == 2  # two distinct IDs
 
 
 # ─── DroneDetector — threat scoring ──────────────────────────────────────────
+
 
 class TestThreatScoring:
 
@@ -187,22 +200,24 @@ class TestThreatScoring:
         assert score > 0.0
 
     def test_authorised_drone_lower_score(self, detector):
-        t_auth = DroneTrack(track_id=1); t_auth.is_authorized = True
-        t_unauth = DroneTrack(track_id=2); t_unauth.is_authorized = False
+        t_auth = DroneTrack(track_id=1)
+        t_auth.is_authorized = True
+        t_unauth = DroneTrack(track_id=2)
+        t_unauth.is_authorized = False
         for t in (t_auth, t_unauth):
             t.positions.append((960, 300, 30, 30))
-        s_auth   = detector._calculate_threat_score(t_auth,   (1080, 1920, 3))
+        s_auth = detector._calculate_threat_score(t_auth, (1080, 1920, 3))
         s_unauth = detector._calculate_threat_score(t_unauth, (1080, 1920, 3))
         assert s_auth < s_unauth
 
     def test_approaching_drone_higher_score(self, detector):
-        t_static   = DroneTrack(track_id=1)
+        t_static = DroneTrack(track_id=1)
         t_approach = DroneTrack(track_id=2)
         for size in [20, 25, 30, 40, 50]:
             t_approach.positions.append((500, 200, size, size))
         for _ in range(5):
             t_static.positions.append((500, 200, 25, 25))
-        s_static   = detector._calculate_threat_score(t_static,   (1080, 1920, 3))
+        s_static = detector._calculate_threat_score(t_static, (1080, 1920, 3))
         s_approach = detector._calculate_threat_score(t_approach, (1080, 1920, 3))
         assert s_approach > s_static
 
@@ -227,6 +242,7 @@ class TestThreatScoring:
 
 # ─── DroneDetector — swarm detection ─────────────────────────────────────────
 
+
 class TestSwarmDetection:
 
     @pytest.fixture
@@ -247,7 +263,6 @@ class TestSwarmDetection:
 
     def test_swarm_detected_with_similar_trajectories(self, detector, frame):
         """Three drones all moving east (direction ≈ 0°) → swarm (circular var < 0.15)."""
-        import math
         for i in range(3):
             track = DroneTrack(track_id=i + 1)
             # All moving right (east) — direction ≈ 0°
@@ -261,19 +276,23 @@ class TestSwarmDetection:
         """Drones flying in completely different directions → no swarm."""
         directions_deg = [0, 90, 180, 270]  # N E S W
         for i, deg in enumerate(directions_deg):
-            rad   = math.radians(deg)
+            rad = math.radians(deg)
             track = DroneTrack(track_id=i + 1)
             track.positions.append((500, 500, 25, 25))
-            track.positions.append((
-                500 + 50 * math.cos(rad),
-                500 + 50 * math.sin(rad),
-                25, 25,
-            ))
+            track.positions.append(
+                (
+                    500 + 50 * math.cos(rad),
+                    500 + 50 * math.sin(rad),
+                    25,
+                    25,
+                )
+            )
             detector.active_tracks[i + 1] = track
         assert detector.detect_swarm() is False
 
 
 # ─── DroneDetector — helpers ──────────────────────────────────────────────────
+
 
 class TestDroneDetectorHelpers:
 
@@ -282,14 +301,17 @@ class TestDroneDetectorHelpers:
         return DroneDetector(confidence_threshold=0.45)
 
     def test_find_nearest_track_returns_closest(self, detector):
-        t1 = DroneTrack(track_id=1); t1.positions.append((100, 100, 20, 20))
-        t2 = DroneTrack(track_id=2); t2.positions.append((500, 500, 20, 20))
+        t1 = DroneTrack(track_id=1)
+        t1.positions.append((100, 100, 20, 20))
+        t2 = DroneTrack(track_id=2)
+        t2.positions.append((500, 500, 20, 20))
         detector.active_tracks = {1: t1, 2: t2}
         result = detector._find_nearest_track(110, 110, max_dist=200)
         assert result is t1
 
     def test_find_nearest_track_returns_none_if_all_too_far(self, detector):
-        t1 = DroneTrack(track_id=1); t1.positions.append((100, 100, 20, 20))
+        t1 = DroneTrack(track_id=1)
+        t1.positions.append((100, 100, 20, 20))
         detector.active_tracks = {1: t1}
         result = detector._find_nearest_track(900, 900, max_dist=50)
         assert result is None
@@ -298,18 +320,23 @@ class TestDroneDetectorHelpers:
         detector.add_authorized_zone(lat=33.6844, lng=73.0479, radius_m=200)
         assert len(detector._authorized_zones) == 1
         zone = detector._authorized_zones[0]
-        assert zone["lat"]      == 33.6844
+        assert zone["lat"] == 33.6844
         assert zone["radius_m"] == 200
 
     def test_get_summary_structure(self, detector):
         summary = detector.get_summary()
-        for key in ["active_drones", "high_threat_drones",
-                    "swarm_detected", "max_threat_score", "tracks"]:
+        for key in [
+            "active_drones",
+            "high_threat_drones",
+            "swarm_detected",
+            "max_threat_score",
+            "tracks",
+        ]:
             assert key in summary
 
     def test_get_summary_empty(self, detector):
         summary = detector.get_summary()
-        assert summary["active_drones"]     == 0
+        assert summary["active_drones"] == 0
         assert summary["high_threat_drones"] == 0
-        assert summary["swarm_detected"]    is False
-        assert summary["max_threat_score"]  == 0.0
+        assert summary["swarm_detected"] is False
+        assert summary["max_threat_score"] == 0.0

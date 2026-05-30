@@ -2,11 +2,12 @@
 QuantumFence - WebSocket Connection Manager
 Handles real-time bidirectional communication for live alerts, camera feeds, and detections.
 """
-from fastapi import WebSocket
-from typing import Dict, List, Set
+
 import json
 import logging
-import asyncio
+from typing import Dict, Set
+
+from fastapi import WebSocket
 
 logger = logging.getLogger("quantumfence.websocket")
 
@@ -14,7 +15,9 @@ logger = logging.getLogger("quantumfence.websocket")
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
-        self.camera_subscribers: Dict[str, Set[str]] = {}  # camera_id -> set of client_ids
+        self.camera_subscribers: Dict[str, Set[str]] = (
+            {}
+        )  # camera_id -> set of client_ids
 
     async def connect(self, websocket: WebSocket, client_id: str):
         await websocket.accept()
@@ -24,9 +27,9 @@ class ConnectionManager:
             {
                 "type": "connected",
                 "client_id": client_id,
-                "message": "Connected to QuantumFence live feed"
+                "message": "Connected to QuantumFence live feed",
             },
-            websocket
+            websocket,
         )
 
     def disconnect(self, websocket: WebSocket, client_id: str):
@@ -67,32 +70,21 @@ class ConnectionManager:
 
     async def broadcast_alert(self, alert_data: dict):
         """Broadcast a new alert to all connected clients."""
-        await self.broadcast({
-            "type": "alert",
-            "data": alert_data
-        })
+        await self.broadcast({"type": "alert", "data": alert_data})
 
     async def broadcast_detection(self, detection_data: dict):
         """Broadcast a detection event to all connected clients."""
-        await self.broadcast({
-            "type": "detection",
-            "data": detection_data
-        })
+        await self.broadcast({"type": "detection", "data": detection_data})
 
     async def broadcast_camera_status(self, camera_id: str, status: str):
         """Broadcast camera status change."""
-        await self.broadcast({
-            "type": "camera_status",
-            "camera_id": camera_id,
-            "status": status
-        })
+        await self.broadcast(
+            {"type": "camera_status", "camera_id": camera_id, "status": status}
+        )
 
     async def broadcast_drone_detection(self, drone_data: dict):
         """Broadcast drone detection event."""
-        await self.broadcast({
-            "type": "drone_detection",
-            "data": drone_data
-        })
+        await self.broadcast({"type": "drone_detection", "data": drone_data})
 
     async def broadcast_to_camera_subscribers(self, camera_id: str, message: dict):
         """Send message only to clients subscribed to a specific camera."""

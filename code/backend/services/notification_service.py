@@ -6,15 +6,15 @@ Bug fixes:
             can be imported even when aiosmtplib is not installed.
   - FIX-15: aiohttp also imported lazily; avoids startup crash when absent.
 """
-import logging
+
 import asyncio
-import json
-from typing import List, Optional, Dict
+import logging
 from datetime import datetime
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
 from pathlib import Path
+from typing import List, Optional
 
 from config.settings import settings
 
@@ -37,12 +37,14 @@ class NotificationService:
     """Handles all outbound notifications for security alerts."""
 
     def __init__(self):
-        self.email_enabled = all([
-            settings.SMTP_HOST,
-            settings.SMTP_USER,
-            settings.SMTP_PASSWORD,
-            settings.ALERT_EMAIL_RECIPIENTS,
-        ])
+        self.email_enabled = all(
+            [
+                settings.SMTP_HOST,
+                settings.SMTP_USER,
+                settings.SMTP_PASSWORD,
+                settings.ALERT_EMAIL_RECIPIENTS,
+            ]
+        )
         self._webhook_urls: List[str] = []
 
     def register_webhook(self, url: str):
@@ -110,24 +112,27 @@ class NotificationService:
 
         try:
             sev_color = {
-                "low":      "#28a745",
-                "medium":   "#ffc107",
-                "high":     "#fd7e14",
+                "low": "#28a745",
+                "medium": "#ffc107",
+                "high": "#fd7e14",
                 "critical": "#dc3545",
             }.get(severity, "#6c757d")
 
             loc_html = (
                 f"<div class='field'><div class='label'>Location</div>"
                 f"<div class='value'>{location}</div></div>"
-                if location else ""
+                if location
+                else ""
             )
-            ai_html  = (
+            ai_html = (
                 f"<div class='ai-box'><strong>🤖 AI Analysis:</strong><br/>{ai_summary}</div>"
-                if ai_summary else ""
+                if ai_summary
+                else ""
             )
             act_html = (
                 f"<div class='action-box'><strong>⚡ Action:</strong><br/>{recommended_action}</div>"
-                if recommended_action else ""
+                if recommended_action
+                else ""
             )
 
             html = f"""<!DOCTYPE html><html><head><style>
@@ -171,17 +176,18 @@ body{{font-family:'Segoe UI',sans-serif;background:#0a0a1a;color:#e0e0e0;margin:
 <div class="footer">QuantumFence Security System · Auto-generated alert · Do not reply</div>
 </div></body></html>"""
 
-            msg           = MIMEMultipart("alternative")
+            msg = MIMEMultipart("alternative")
             msg["Subject"] = f"[QUANTUMFENCE] {severity.upper()} ALERT: {title}"
-            msg["From"]    = settings.SMTP_USER
-            msg["To"]      = ", ".join(settings.ALERT_EMAIL_RECIPIENTS)
+            msg["From"] = settings.SMTP_USER
+            msg["To"] = ", ".join(settings.ALERT_EMAIL_RECIPIENTS)
             msg.attach(MIMEText(html, "html"))
 
             if snapshot_path and Path(snapshot_path).exists():
                 with open(snapshot_path, "rb") as f:
                     img = MIMEImage(f.read())
-                    img.add_header("Content-Disposition", "attachment",
-                                   filename="detection.jpg")
+                    img.add_header(
+                        "Content-Disposition", "attachment", filename="detection.jpg"
+                    )
                     msg.attach(img)
 
             await aiosmtplib.send(
@@ -215,16 +221,16 @@ body{{font-family:'Segoe UI',sans-serif;background:#0a0a1a;color:#e0e0e0;margin:
             return
 
         payload = {
-            "system":     "QuantumFence",
-            "event":      "security_alert",
+            "system": "QuantumFence",
+            "event": "security_alert",
             "alert_type": alert_type,
-            "severity":   severity,
-            "title":      title,
+            "severity": severity,
+            "title": title,
             "description": description,
-            "camera":     camera_name,
-            "location":   location,
+            "camera": camera_name,
+            "location": location,
             "ai_summary": ai_summary,
-            "timestamp":  datetime.utcnow().isoformat(),
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         async with aiohttp.ClientSession() as session:
@@ -235,7 +241,7 @@ body{{font-family:'Segoe UI',sans-serif;background:#0a0a1a;color:#e0e0e0;margin:
                         json=payload,
                         headers={
                             "Content-Type": "application/json",
-                            "X-Source":     "QuantumFence",
+                            "X-Source": "QuantumFence",
                         },
                         timeout=aiohttp.ClientTimeout(total=10),
                     ) as resp:

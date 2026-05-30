@@ -3,12 +3,11 @@ Tests for PerimeterService.
 Covers polygon containment, buffer zones, loitering detection,
 approach vector analysis, alert cooldowns, and the Haversine formula.
 """
-import pytest
-import asyncio
+
 import time
 from datetime import datetime, timedelta
-from unittest.mock import patch
 
+import pytest
 from services.perimeter_service import PerimeterService
 
 pytestmark = pytest.mark.unit
@@ -16,36 +15,38 @@ pytestmark = pytest.mark.unit
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def svc():
     return PerimeterService()
 
 
 SQUARE_FENCE = {
-    "id":            1,
-    "name":          "Test Square",
-    "fence_type":    "polygon",
-    "coordinates":   [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]],
+    "id": 1,
+    "name": "Test Square",
+    "fence_type": "polygon",
+    "coordinates": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]],
     "buffer_meters": 0.0,
-    "is_active":     True,
+    "is_active": True,
     "alert_on_entry": True,
 }
 
 CIRCLE_FENCE = {
-    "id":             2,
-    "name":           "Test Circle",
-    "fence_type":     "circle",
-    "coordinates":    [],
-    "center_lat":     33.6844,
-    "center_lng":     73.0479,
-    "radius_meters":  500.0,
-    "buffer_meters":  0.0,
-    "is_active":      True,
+    "id": 2,
+    "name": "Test Circle",
+    "fence_type": "circle",
+    "coordinates": [],
+    "center_lat": 33.6844,
+    "center_lng": 73.0479,
+    "radius_meters": 500.0,
+    "buffer_meters": 0.0,
+    "is_active": True,
     "alert_on_entry": True,
 }
 
 
 # ─── Haversine distance ───────────────────────────────────────────────────────
+
 
 class TestHaversineDistance:
 
@@ -71,6 +72,7 @@ class TestHaversineDistance:
 
 # ─── Point-in-polygon ─────────────────────────────────────────────────────────
 
+
 class TestPointInPolygon:
     """Uses a unit-square polygon at (0,0)→(1,1)."""
 
@@ -90,43 +92,43 @@ class TestPointInPolygon:
     def test_multiple_inside_points(self, svc):
         inside_points = [(0.1, 0.1), (0.9, 0.9), (0.5, 0.1), (0.5, 0.9)]
         for lat, lng in inside_points:
-            assert svc._point_in_polygon(lat, lng,
-                                         SQUARE_FENCE["coordinates"]) is True, \
-                   f"Expected ({lat},{lng}) to be inside"
+            assert (
+                svc._point_in_polygon(lat, lng, SQUARE_FENCE["coordinates"]) is True
+            ), f"Expected ({lat},{lng}) to be inside"
 
 
 # ─── Point-in-circle ──────────────────────────────────────────────────────────
 
+
 class TestPointInCircle:
 
     def test_centre_is_inside(self, svc):
-        assert svc._point_in_circle(
-            33.6844, 73.0479, 33.6844, 73.0479, 500.0
-        ) is True
+        assert svc._point_in_circle(33.6844, 73.0479, 33.6844, 73.0479, 500.0) is True
 
     def test_nearby_point_inside_radius(self, svc):
         # ~100 m north
-        assert svc._point_in_circle(
-            33.6854, 73.0479, 33.6844, 73.0479, 500.0
-        ) is True
+        assert svc._point_in_circle(33.6854, 73.0479, 33.6844, 73.0479, 500.0) is True
 
     def test_far_point_outside_radius(self, svc):
         # ~10 km north
-        assert svc._point_in_circle(
-            33.7744, 73.0479, 33.6844, 73.0479, 500.0
-        ) is False
+        assert svc._point_in_circle(33.7744, 73.0479, 33.6844, 73.0479, 500.0) is False
 
 
 # ─── Buffer zone ─────────────────────────────────────────────────────────────
+
 
 class TestBufferZone:
 
     @pytest.mark.asyncio
     async def test_point_in_buffer_triggers_alert(self, svc):
         """Point 5 m outside polygon should trigger with 10 m buffer."""
-        fence = {**SQUARE_FENCE, "buffer_meters": 500_000}  # huge buffer in m for lat/lng
+        fence = {
+            **SQUARE_FENCE,
+            "buffer_meters": 500_000,
+        }  # huge buffer in m for lat/lng
         breaches = await svc.check_detection_against_geofences(
-            detection_lat=2.0, detection_lng=0.5,   # outside polygon
+            detection_lat=2.0,
+            detection_lng=0.5,  # outside polygon
             detection_type="person",
             camera_id=1,
             geofences=[fence],
@@ -137,7 +139,8 @@ class TestBufferZone:
     async def test_inactive_fence_skipped(self, svc):
         fence = {**SQUARE_FENCE, "is_active": False}
         breaches = await svc.check_detection_against_geofences(
-            detection_lat=0.5, detection_lng=0.5,
+            detection_lat=0.5,
+            detection_lng=0.5,
             detection_type="person",
             camera_id=1,
             geofences=[fence],
@@ -148,7 +151,8 @@ class TestBufferZone:
     async def test_no_alert_when_alert_on_entry_false(self, svc):
         fence = {**SQUARE_FENCE, "alert_on_entry": False}
         breaches = await svc.check_detection_against_geofences(
-            detection_lat=0.5, detection_lng=0.5,
+            detection_lat=0.5,
+            detection_lng=0.5,
             detection_type="person",
             camera_id=1,
             geofences=[fence],
@@ -158,19 +162,16 @@ class TestBufferZone:
 
 # ─── Cooldown ─────────────────────────────────────────────────────────────────
 
+
 class TestAlertCooldown:
 
     @pytest.mark.asyncio
     async def test_second_alert_within_cooldown_suppressed(self, svc):
         fence = {**SQUARE_FENCE}
         # First detection → breach
-        b1 = await svc.check_detection_against_geofences(
-            0.5, 0.5, "person", 1, [fence]
-        )
+        b1 = await svc.check_detection_against_geofences(0.5, 0.5, "person", 1, [fence])
         # Immediate second detection → suppressed
-        b2 = await svc.check_detection_against_geofences(
-            0.5, 0.5, "person", 1, [fence]
-        )
+        b2 = await svc.check_detection_against_geofences(0.5, 0.5, "person", 1, [fence])
         assert len(b1) == 1
         assert len(b2) == 0
 
@@ -190,10 +191,13 @@ class TestAlertCooldown:
 
 # ─── Loitering detection ──────────────────────────────────────────────────────
 
+
 class TestLoiteringDetection:
 
     def test_no_loitering_on_first_sighting(self, svc):
-        result = svc.detect_loitering("track_001", 33.68, 73.04, loiter_threshold_seconds=5.0)
+        result = svc.detect_loitering(
+            "track_001", 33.68, 73.04, loiter_threshold_seconds=5.0
+        )
         assert result is False
 
     def test_loitering_detected_after_threshold(self, svc):
@@ -203,8 +207,8 @@ class TestLoiteringDetection:
             svc.detect_loitering(track_id, 33.68, 73.04, loiter_threshold_seconds=2.0)
         # Force the first recorded timestamp to be 3 seconds old
         tracker_key = f"loiter_{track_id}"
-        svc._loitering_tracker[tracker_key][0] = (
-            datetime.utcnow() - timedelta(seconds=3)
+        svc._loitering_tracker[tracker_key][0] = datetime.utcnow() - timedelta(
+            seconds=3
         )
         result = svc.detect_loitering(
             track_id, 33.68, 73.04, loiter_threshold_seconds=2.0
@@ -221,6 +225,7 @@ class TestLoiteringDetection:
 
 # ─── Approach vector analysis ─────────────────────────────────────────────────
 
+
 class TestApproachVectorAnalysis:
 
     # GeoJSON [lng, lat] convention
@@ -232,16 +237,14 @@ class TestApproachVectorAnalysis:
 
     def test_approaching_object(self, svc):
         """Positions move steadily toward lat=0 boundary."""
-        positions = [(5.0, 0.5), (4.0, 0.5), (3.0, 0.5),
-                     (2.0, 0.5), (1.5, 0.5)]
+        positions = [(5.0, 0.5), (4.0, 0.5), (3.0, 0.5), (2.0, 0.5), (1.5, 0.5)]
         result = svc.analyze_approach_vector(positions, self.FENCE_COORDS)
         assert result["approaching"] is True
-        assert result["distance_m"]  is not None
+        assert result["distance_m"] is not None
 
     def test_receding_object(self, svc):
         """Positions move away from fence."""
-        positions = [(1.5, 0.5), (2.0, 0.5), (3.0, 0.5),
-                     (4.0, 0.5), (5.0, 0.5)]
+        positions = [(1.5, 0.5), (2.0, 0.5), (3.0, 0.5), (4.0, 0.5), (5.0, 0.5)]
         result = svc.analyze_approach_vector(positions, self.FENCE_COORDS)
         assert result["approaching"] is False
 
@@ -249,11 +252,18 @@ class TestApproachVectorAnalysis:
         result = svc.analyze_approach_vector(
             [(1.0, 0.5), (0.8, 0.5), (0.6, 0.5)], self.FENCE_COORDS
         )
-        for key in ["approaching", "distance_m", "rate_m_per_frame", "eta_seconds", "threat_vector"]:
+        for key in [
+            "approaching",
+            "distance_m",
+            "rate_m_per_frame",
+            "eta_seconds",
+            "threat_vector",
+        ]:
             assert key in result
 
 
 # ─── Severity calculation ─────────────────────────────────────────────────────
+
 
 class TestSeverityCalculation:
 

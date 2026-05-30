@@ -4,26 +4,27 @@ Covers camera start/stop lifecycle, frame processing pipeline,
 alert + drone detection DB persistence, and snapshot saving.
 All camera I/O is mocked — no real streams or GPU needed.
 """
-import pytest
-import asyncio
-import numpy as np
+
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.detection_service import DetectionService, CameraProcessor
+import numpy as np
+import pytest
+from services.detection_service import CameraProcessor, DetectionService
 
 pytestmark = pytest.mark.unit
 
 
 # ─── CameraProcessor ─────────────────────────────────────────────────────────
 
+
 class TestCameraProcessor:
 
     def test_simulated_url_skips_cv2_open(self):
         proc = CameraProcessor(camera_id=1, stream_url="simulated", config={})
         proc._open_stream()
-        assert proc.cap is None   # no real VideoCapture opened
+        assert proc.cap is None  # no real VideoCapture opened
 
     def test_empty_url_skips_cv2_open(self):
         proc = CameraProcessor(camera_id=2, stream_url="", config={})
@@ -31,7 +32,7 @@ class TestCameraProcessor:
         assert proc.cap is None
 
     def test_generate_test_frame_returns_correct_shape(self):
-        proc  = CameraProcessor(1, "simulated", {})
+        proc = CameraProcessor(1, "simulated", {})
         frame = proc._generate_test_frame()
         assert frame.shape == (720, 1280, 3)
         assert frame.dtype == np.uint8
@@ -43,7 +44,7 @@ class TestCameraProcessor:
         assert proc.frame_count == 1
 
     def test_get_frame_falls_back_to_synthetic_when_no_cap(self):
-        proc  = CameraProcessor(1, "simulated", {})
+        proc = CameraProcessor(1, "simulated", {})
         frame = proc.get_frame()
         assert frame is not None
         assert frame.shape == (720, 1280, 3)
@@ -55,9 +56,9 @@ class TestCameraProcessor:
         assert proc.is_running is False
 
     def test_stop_releases_cap_if_open(self):
-        proc      = CameraProcessor(1, "simulated", {})
-        mock_cap  = MagicMock()
-        proc.cap  = mock_cap
+        proc = CameraProcessor(1, "simulated", {})
+        mock_cap = MagicMock()
+        proc.cap = mock_cap
         proc.stop()
         mock_cap.release.assert_called_once()
         assert proc.cap is None
@@ -71,6 +72,7 @@ class TestCameraProcessor:
 
 # ─── DetectionService — initialisation ───────────────────────────────────────
 
+
 class TestDetectionServiceInit:
 
     @pytest.mark.asyncio
@@ -79,10 +81,11 @@ class TestDetectionServiceInit:
         mock_mm = MagicMock()
         mock_mm.load_all_models = AsyncMock()
 
-        with patch("services.detection_service.ModelManager",
-                   return_value=mock_mm), \
-             patch("services.detection_service.AIAnalysisService"), \
-             patch("services.detection_service.SessionLocal"):
+        with patch(
+            "services.detection_service.ModelManager", return_value=mock_mm
+        ), patch("services.detection_service.AIAnalysisService"), patch(
+            "services.detection_service.SessionLocal"
+        ):
             await svc.initialize()
 
         mock_mm.load_all_models.assert_called_once()
@@ -91,8 +94,10 @@ class TestDetectionServiceInit:
     @pytest.mark.asyncio
     async def test_initialize_exception_does_not_crash(self):
         svc = DetectionService()
-        with patch("services.detection_service.ModelManager",
-                   side_effect=ImportError("no ultralytics")):
+        with patch(
+            "services.detection_service.ModelManager",
+            side_effect=ImportError("no ultralytics"),
+        ):
             # Should log and continue, not raise
             await svc.initialize()
         # Service should still be usable
@@ -101,6 +106,7 @@ class TestDetectionServiceInit:
 
 # ─── DetectionService — camera lifecycle ─────────────────────────────────────
 
+
 class TestCameraLifecycle:
 
     @pytest.fixture
@@ -108,11 +114,11 @@ class TestCameraLifecycle:
         s = DetectionService()
         # Pre-wire a mock model manager that returns zero detections
         s.model_manager = MagicMock()
-        s.model_manager.detect_persons  = MagicMock(return_value=[])
+        s.model_manager.detect_persons = MagicMock(return_value=[])
         s.model_manager.detect_vehicles = MagicMock(return_value=[])
-        s.model_manager.detect_drones   = MagicMock(return_value=[])
-        s.ai_analysis          = None
-        s.db_session_factory   = None
+        s.model_manager.detect_drones = MagicMock(return_value=[])
+        s.ai_analysis = None
+        s.db_session_factory = None
         return s
 
     @pytest.mark.asyncio
@@ -154,17 +160,18 @@ class TestCameraLifecycle:
 
 # ─── DetectionService — _run_detections ──────────────────────────────────────
 
+
 class TestRunDetections:
 
     @pytest.fixture
     def svc_with_mock_ws(self):
         s = DetectionService()
-        s.model_manager          = MagicMock()
-        s.model_manager.detect_persons  = MagicMock(return_value=[])
+        s.model_manager = MagicMock()
+        s.model_manager.detect_persons = MagicMock(return_value=[])
         s.model_manager.detect_vehicles = MagicMock(return_value=[])
-        s.model_manager.detect_drones   = MagicMock(return_value=[])
-        s.ai_analysis          = None
-        s.db_session_factory   = None
+        s.model_manager.detect_drones = MagicMock(return_value=[])
+        s.ai_analysis = None
+        s.db_session_factory = None
         return s
 
     @pytest.fixture
@@ -182,32 +189,48 @@ class TestRunDetections:
     async def test_detections_broadcast_via_websocket(
         self, svc_with_mock_ws, blank_frame
     ):
-        high_conf_det = {"confidence": 0.92, "bbox": [100, 100, 50, 50], "class": "person"}
+        high_conf_det = {
+            "confidence": 0.92,
+            "bbox": [100, 100, 50, 50],
+            "class": "person",
+        }
         svc_with_mock_ws.model_manager.detect_persons.return_value = [high_conf_det]
 
         with patch("services.detection_service.manager") as mock_ws:
             mock_ws.broadcast_detection = AsyncMock()
             await svc_with_mock_ws._run_detections(
-                1, blank_frame,
-                {"detect_persons": True, "detect_vehicles": False, "detect_drones": False},
+                1,
+                blank_frame,
+                {
+                    "detect_persons": True,
+                    "detect_vehicles": False,
+                    "detect_drones": False,
+                },
             )
             mock_ws.broadcast_detection.assert_called_once()
             call_args = mock_ws.broadcast_detection.call_args[0][0]
-            assert call_args["camera_id"]   == 1
+            assert call_args["camera_id"] == 1
             assert len(call_args["detections"]) == 1
 
     @pytest.mark.asyncio
-    async def test_low_confidence_not_broadcast(
-        self, svc_with_mock_ws, blank_frame
-    ):
-        low_conf_det = {"confidence": 0.30, "bbox": [100, 100, 50, 50], "class": "person"}
+    async def test_low_confidence_not_broadcast(self, svc_with_mock_ws, blank_frame):
+        low_conf_det = {
+            "confidence": 0.30,
+            "bbox": [100, 100, 50, 50],
+            "class": "person",
+        }
         svc_with_mock_ws.model_manager.detect_persons.return_value = [low_conf_det]
 
         with patch("services.detection_service.manager") as mock_ws:
             mock_ws.broadcast_detection = AsyncMock()
             await svc_with_mock_ws._run_detections(
-                1, blank_frame,
-                {"detect_persons": True, "detect_vehicles": False, "detect_drones": False},
+                1,
+                blank_frame,
+                {
+                    "detect_persons": True,
+                    "detect_vehicles": False,
+                    "detect_drones": False,
+                },
             )
             mock_ws.broadcast_detection.assert_not_called()
 
@@ -215,16 +238,25 @@ class TestRunDetections:
     async def test_drone_detection_triggers_handle_drone(
         self, svc_with_mock_ws, blank_frame
     ):
-        drone_det = {"confidence": 0.87, "bbox": [600, 100, 30, 30],
-                     "class": "drone", "drone_type": "quadcopter"}
+        drone_det = {
+            "confidence": 0.87,
+            "bbox": [600, 100, 30, 30],
+            "class": "drone",
+            "drone_type": "quadcopter",
+        }
         svc_with_mock_ws.model_manager.detect_drones.return_value = [drone_det]
         svc_with_mock_ws._handle_drone_detection = AsyncMock()
 
         with patch("services.detection_service.manager") as mock_ws:
             mock_ws.broadcast_detection = AsyncMock()
             await svc_with_mock_ws._run_detections(
-                1, blank_frame,
-                {"detect_persons": False, "detect_vehicles": False, "detect_drones": True},
+                1,
+                blank_frame,
+                {
+                    "detect_persons": False,
+                    "detect_vehicles": False,
+                    "detect_drones": True,
+                },
             )
         svc_with_mock_ws._handle_drone_detection.assert_called_once()
 
@@ -236,13 +268,15 @@ class TestRunDetections:
             {"confidence": 0.95, "bbox": [0, 0, 100, 200]}
         ]
         await svc_with_mock_ws._run_detections(
-            1, blank_frame,
+            1,
+            blank_frame,
             {"detect_persons": False, "detect_vehicles": False, "detect_drones": False},
         )
         svc_with_mock_ws.model_manager.detect_persons.assert_not_called()
 
 
 # ─── DetectionService — alert creation ───────────────────────────────────────
+
 
 class TestAlertCreation:
 
@@ -253,10 +287,10 @@ class TestAlertCreation:
         so the detection service's try/finally db.close() does not
         close the underlying test session/connection.
         """
-        from sqlalchemy.orm import Session as SASession
 
         class _NoCloseSession:
             """Delegate all attribute access to the real session but no-op close()."""
+
             def __init__(self, real):
                 self._real = real
 
@@ -270,9 +304,9 @@ class TestAlertCreation:
                 pass  # no-op to avoid aborting the test transaction
 
         s = DetectionService()
-        s.model_manager        = MagicMock()
-        s.ai_analysis          = None
-        s.db_session_factory   = lambda: _NoCloseSession(db_session)
+        s.model_manager = MagicMock()
+        s.ai_analysis = None
+        s.db_session_factory = lambda: _NoCloseSession(db_session)
         return s
 
     @pytest.mark.asyncio
@@ -280,14 +314,22 @@ class TestAlertCreation:
         self, svc_with_db, db_session, make_camera, blank_frame
     ):
         from database.models import Alert
+
         cam = make_camera()
-        detections = [{"type": "person", "confidence": 0.88,
-                       "bbox": [100, 100, 60, 80], "timestamp": "2024-01-01T00:00:00"}]
+        detections = [
+            {
+                "type": "person",
+                "confidence": 0.88,
+                "bbox": [100, 100, 60, 80],
+                "timestamp": "2024-01-01T00:00:00",
+            }
+        ]
 
         with patch("services.detection_service.manager") as mock_ws:
             mock_ws.broadcast_alert = AsyncMock()
-            with patch.object(svc_with_db, "_save_snapshot",
-                               new_callable=AsyncMock, return_value=None):
+            with patch.object(
+                svc_with_db, "_save_snapshot", new_callable=AsyncMock, return_value=None
+            ):
                 await svc_with_db._create_alert(
                     cam.id, detections, blank_frame, datetime.utcnow()
                 )
@@ -301,13 +343,20 @@ class TestAlertCreation:
         self, svc_with_db, make_camera, blank_frame
     ):
         cam = make_camera()
-        detections = [{"type": "vehicle", "confidence": 0.79,
-                       "bbox": [200, 150, 120, 80], "timestamp": "2024-01-01T00:00:00"}]
+        detections = [
+            {
+                "type": "vehicle",
+                "confidence": 0.79,
+                "bbox": [200, 150, 120, 80],
+                "timestamp": "2024-01-01T00:00:00",
+            }
+        ]
 
         with patch("services.detection_service.manager") as mock_ws:
             mock_ws.broadcast_alert = AsyncMock()
-            with patch.object(svc_with_db, "_save_snapshot",
-                               new_callable=AsyncMock, return_value=None):
+            with patch.object(
+                svc_with_db, "_save_snapshot", new_callable=AsyncMock, return_value=None
+            ):
                 await svc_with_db._create_alert(
                     cam.id, detections, blank_frame, datetime.utcnow()
                 )
@@ -318,11 +367,10 @@ class TestAlertCreation:
         self, svc_with_db, db_session, make_camera, blank_frame
     ):
         from database.models import Alert
+
         cam = make_camera()
         with patch("services.detection_service.manager"):
-            await svc_with_db._create_alert(
-                cam.id, [], blank_frame, datetime.utcnow()
-            )
+            await svc_with_db._create_alert(cam.id, [], blank_frame, datetime.utcnow())
         count = db_session.query(Alert).filter(Alert.camera_id == cam.id).count()
         assert count == 0
 
@@ -331,21 +379,31 @@ class TestAlertCreation:
         self, svc_with_db, db_session, make_camera, blank_frame
     ):
         from database.models import Alert, AlertSeverity
+
         mock_ai = MagicMock()
-        mock_ai.analyze_threat = AsyncMock(return_value={
-            "threat_level": "critical",
-            "summary": "Critical threat",
-            "recommended_action": "Lockdown",
-        })
+        mock_ai.analyze_threat = AsyncMock(
+            return_value={
+                "threat_level": "critical",
+                "summary": "Critical threat",
+                "recommended_action": "Lockdown",
+            }
+        )
         svc_with_db.ai_analysis = mock_ai
         cam = make_camera()
-        detections = [{"type": "drone", "confidence": 0.97,
-                       "bbox": [300, 50, 30, 30], "timestamp": "2024-01-01T00:00:00"}]
+        detections = [
+            {
+                "type": "drone",
+                "confidence": 0.97,
+                "bbox": [300, 50, 30, 30],
+                "timestamp": "2024-01-01T00:00:00",
+            }
+        ]
 
         with patch("services.detection_service.manager") as mock_ws:
             mock_ws.broadcast_alert = AsyncMock()
-            with patch.object(svc_with_db, "_save_snapshot",
-                               new_callable=AsyncMock, return_value=None):
+            with patch.object(
+                svc_with_db, "_save_snapshot", new_callable=AsyncMock, return_value=None
+            ):
                 await svc_with_db._create_alert(
                     cam.id, detections, blank_frame, datetime.utcnow()
                 )
@@ -357,6 +415,7 @@ class TestAlertCreation:
 
 # ─── DetectionService — snapshot saving ─────────────────────────────────────
 
+
 class TestSnapshotSaving:
 
     @pytest.fixture
@@ -366,12 +425,14 @@ class TestSnapshotSaving:
 
     @pytest.mark.asyncio
     async def test_save_snapshot_creates_file(self, svc, tmp_path, monkeypatch):
-        import cv2
         from config.settings import settings
+
         monkeypatch.setattr(settings, "SNAPSHOTS_DIR", str(tmp_path))
 
         frame = np.zeros((100, 100, 3), dtype=np.uint8)
-        path  = await svc._save_snapshot(1, frame, "person", datetime(2024, 1, 1, 12, 0, 0))
+        path = await svc._save_snapshot(
+            1, frame, "person", datetime(2024, 1, 1, 12, 0, 0)
+        )
 
         assert path is not None
         assert Path(path).exists()
@@ -380,21 +441,25 @@ class TestSnapshotSaving:
     @pytest.mark.asyncio
     async def test_save_snapshot_filename_format(self, svc, tmp_path, monkeypatch):
         from config.settings import settings
+
         monkeypatch.setattr(settings, "SNAPSHOTS_DIR", str(tmp_path))
 
         frame = np.zeros((100, 100, 3), dtype=np.uint8)
-        ts    = datetime(2024, 6, 15, 14, 30, 45)
-        path  = await svc._save_snapshot(3, frame, "drone", ts)
+        ts = datetime(2024, 6, 15, 14, 30, 45)
+        path = await svc._save_snapshot(3, frame, "drone", ts)
 
         filename = Path(path).name
-        assert "cam03"       in filename
-        assert "drone"       in filename
-        assert "20240615"    in filename
-        assert "143045"      in filename
+        assert "cam03" in filename
+        assert "drone" in filename
+        assert "20240615" in filename
+        assert "143045" in filename
 
     @pytest.mark.asyncio
-    async def test_save_snapshot_returns_none_on_error(self, svc, tmp_path, monkeypatch):
+    async def test_save_snapshot_returns_none_on_error(
+        self, svc, tmp_path, monkeypatch
+    ):
         from config.settings import settings
+
         monkeypatch.setattr(settings, "SNAPSHOTS_DIR", "/nonexistent/path/xyz")
 
         frame = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -407,15 +472,23 @@ class TestSnapshotSaving:
 
 # ─── DetectionService — DB helpers ───────────────────────────────────────────
 
+
 class TestDetectionServiceDBHelpers:
 
     @pytest.fixture
     def svc(self, db_session):
         class _NoCloseSession:
-            def __init__(self, real): self._real = real
-            def __getattr__(self, name): return getattr(self._real, name)
-            def close(self): pass
-            def rollback(self): pass
+            def __init__(self, real):
+                self._real = real
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+            def close(self):
+                pass
+
+            def rollback(self):
+                pass
 
         s = DetectionService()
         s.db_session_factory = lambda: _NoCloseSession(db_session)
@@ -423,6 +496,7 @@ class TestDetectionServiceDBHelpers:
 
     def test_set_camera_status_updates_db(self, svc, db_session, make_camera):
         from database.models import CameraStatus
+
         cam = make_camera(status=CameraStatus.INITIALIZING)
         svc._set_camera_status(cam.id, "online")
         db_session.refresh(cam)
@@ -430,6 +504,7 @@ class TestDetectionServiceDBHelpers:
 
     def test_set_camera_status_disabled(self, svc, db_session, make_camera):
         from database.models import CameraStatus
+
         cam = make_camera(status=CameraStatus.ONLINE)
         svc._set_camera_status(cam.id, "disabled")
         db_session.refresh(cam)
@@ -440,7 +515,7 @@ class TestDetectionServiceDBHelpers:
 
         cam = make_camera()
         cam_id = cam.id
-        ts  = datetime(2024, 1, 1, 12, 0, 0)
+        ts = datetime(2024, 1, 1, 12, 0, 0)
         svc._touch_camera(cam_id, ts)
         updated = db_session.query(Camera).filter(Camera.id == cam_id).first()
         assert updated.last_seen is not None

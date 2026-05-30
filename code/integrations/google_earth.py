@@ -5,12 +5,12 @@ Bug fixes:
   - FIX-26: generate_static_map_url builds markers as list (not dict) for urlencode
   - FIX-27: estimate_detection_location protected against division by zero
 """
+
 import logging
 import math
-import urllib.parse
-from typing import List, Dict, Optional, Tuple, Any
+from dataclasses import dataclass
 from datetime import datetime
-from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
 from config.settings import settings
 
@@ -40,12 +40,12 @@ class GoogleEarthIntegration:
     """Integrates QuantumFence with Google Maps/Earth APIs."""
 
     MAPS_STATIC_URL = "https://maps.googleapis.com/maps/api/staticmap"
-    GEOCODE_URL     = "https://maps.googleapis.com/maps/api/geocode/json"
+    GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
     def __init__(self):
-        self.api_key     = settings.GOOGLE_MAPS_API_KEY
-        self.center_lat  = settings.DEFAULT_MAP_CENTER_LAT
-        self.center_lng  = settings.DEFAULT_MAP_CENTER_LNG
+        self.api_key = settings.GOOGLE_MAPS_API_KEY
+        self.center_lat = settings.DEFAULT_MAP_CENTER_LAT
+        self.center_lng = settings.DEFAULT_MAP_CENTER_LNG
 
     def generate_static_map_url(
         self,
@@ -59,7 +59,7 @@ class GoogleEarthIntegration:
             return self._generate_osm_url()
 
         # FIX-26: build params then encode — markers as repeated params
-        parts  = [
+        parts = [
             f"center={self.center_lat},{self.center_lng}",
             f"zoom={zoom}",
             f"size={size}",
@@ -94,17 +94,17 @@ class GoogleEarthIntegration:
         geofences: List[Dict],
         threats: Optional[List[ThreatMarker]] = None,
     ) -> str:
-        ts    = datetime.utcnow().strftime("%Y-%m-%d")
+        ts = datetime.utcnow().strftime("%Y-%m-%d")
         parts = [
             '<?xml version="1.0" encoding="UTF-8"?>',
             '<kml xmlns="http://www.opengis.net/kml/2.2">',
             "<Document>",
             f"<name>QuantumFence — Security Map — {ts}</name>",
             "<description>QuantumFence Perimeter Security Visualization</description>",
-            self._kml_style("camera_online",  "ff00ff00", "camera_icon"),
+            self._kml_style("camera_online", "ff00ff00", "camera_icon"),
             self._kml_style("camera_offline", "ff7a9bb5", "camera_icon"),
-            self._kml_style("threat_style",   "ff0000ff", "caution"),
-            self._kml_style("drone_style",    "ff00ffff", "airports"),
+            self._kml_style("threat_style", "ff0000ff", "caution"),
+            self._kml_style("drone_style", "ff00ffff", "airports"),
             "<Folder><name>Security Cameras</name>",
         ]
 
@@ -113,8 +113,10 @@ class GoogleEarthIntegration:
             lng = cam.get("longitude")
             if lat is None or lng is None:
                 continue
-            style = "camera_online" if cam.get("status") == "online" else "camera_offline"
-            alt   = cam.get("altitude_meters", 0)
+            style = (
+                "camera_online" if cam.get("status") == "online" else "camera_offline"
+            )
+            alt = cam.get("altitude_meters", 0)
             parts.append(
                 f"<Placemark>"
                 f"<name>{self._xml_escape(cam.get('name', 'Camera'))}</name>"
@@ -174,17 +176,17 @@ class GoogleEarthIntegration:
         if len(hex_color) == 6:
             r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
             # KML fill: 50% opacity → 80BBGGRR
-            kml_fill  = f"80{b}{g}{r}"
+            kml_fill = f"80{b}{g}{r}"
             # KML line: full opacity → FFBBGGRR
-            kml_line  = f"ff{b}{g}{r}"
+            kml_line = f"ff{b}{g}{r}"
         else:
-            kml_fill  = "80FF4444"
-            kml_line  = "ffFF4444"
+            kml_fill = "80FF4444"
+            kml_line = "ffFF4444"
 
         # coords = [[lng, lat], ...]
         coord_str = " ".join(f"{c[0]},{c[1]},0" for c in coords)
-        name      = self._xml_escape(geofence.get("name", "Geofence"))
-        desc      = self._xml_escape(geofence.get("description", ""))
+        name = self._xml_escape(geofence.get("name", "Geofence"))
+        desc = self._xml_escape(geofence.get("description", ""))
         return (
             f"<Placemark>"
             f"<name>{name}</name>"
@@ -201,21 +203,22 @@ class GoogleEarthIntegration:
 
     def calculate_camera_fov_polygon(
         self,
-        lat: float, lng: float,
+        lat: float,
+        lng: float,
         direction_deg: float,
         fov_deg: float,
         range_meters: float = 100.0,
     ) -> List[Tuple[float, float]]:
-        R         = 6_371_000
-        half_fov  = fov_deg / 2
-        angles    = [direction_deg - half_fov, direction_deg, direction_deg + half_fov]
-        polygon   = [(lat, lng)]
+        R = 6_371_000
+        half_fov = fov_deg / 2
+        angles = [direction_deg - half_fov, direction_deg, direction_deg + half_fov]
+        polygon = [(lat, lng)]
 
         for angle_deg in angles:
             angle_rad = math.radians(angle_deg)
-            lat_r     = math.radians(lat)
-            lng_r     = math.radians(lng)
-            d         = range_meters / R
+            lat_r = math.radians(lat)
+            lng_r = math.radians(lng)
+            d = range_meters / R
 
             dest_lat_r = math.asin(
                 math.sin(lat_r) * math.cos(d)
@@ -227,7 +230,7 @@ class GoogleEarthIntegration:
             )
             polygon.append((math.degrees(dest_lat_r), math.degrees(dest_lng_r)))
 
-        polygon.append((lat, lng))   # close ring
+        polygon.append((lat, lng))  # close ring
         return polygon
 
     def estimate_detection_location(
@@ -236,8 +239,8 @@ class GoogleEarthIntegration:
         camera_lng: float,
         camera_direction: float,
         camera_fov: float,
-        bbox_center_x: float,   # 0.0 – 1.0
-        bbox_center_y: float,   # 0.0 – 1.0
+        bbox_center_x: float,  # 0.0 – 1.0
+        bbox_center_y: float,  # 0.0 – 1.0
         estimated_range_m: float = 50.0,
     ) -> Tuple[float, float]:
         """
@@ -249,15 +252,15 @@ class GoogleEarthIntegration:
             estimated_range_m = 50.0
 
         angle_offset = (bbox_center_x - 0.5) * camera_fov
-        bearing      = camera_direction + angle_offset
+        bearing = camera_direction + angle_offset
         # Higher in frame → farther away
-        range_m      = estimated_range_m * max(0.5, 1.0 + (0.5 - bbox_center_y))
+        range_m = estimated_range_m * max(0.5, 1.0 + (0.5 - bbox_center_y))
 
-        R         = 6_371_000
-        lat_r     = math.radians(camera_lat)
-        lng_r     = math.radians(camera_lng)
+        R = 6_371_000
+        lat_r = math.radians(camera_lat)
+        lng_r = math.radians(camera_lng)
         bearing_r = math.radians(bearing)
-        d         = range_m / R
+        d = range_m / R
 
         dest_lat = math.asin(
             math.sin(lat_r) * math.cos(d)
@@ -271,12 +274,12 @@ class GoogleEarthIntegration:
 
     def get_map_config(self) -> Dict[str, Any]:
         return {
-            "center":          {"lat": self.center_lat, "lng": self.center_lng},
-            "zoom":            16,
-            "map_type":        "satellite",
-            "api_key":         self.api_key or None,
+            "center": {"lat": self.center_lat, "lng": self.center_lng},
+            "zoom": 16,
+            "map_type": "satellite",
+            "api_key": self.api_key or None,
             "use_google_maps": bool(self.api_key),
-            "tile_provider":   "google" if self.api_key else "openstreetmap",
+            "tile_provider": "google" if self.api_key else "openstreetmap",
         }
 
     @staticmethod
@@ -284,7 +287,7 @@ class GoogleEarthIntegration:
         """Escape special characters for XML/KML content."""
         return (
             text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
         )

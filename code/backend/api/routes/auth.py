@@ -3,21 +3,22 @@ QuantumFence - Authentication Routes
 Bug fixes:
   - FIX-15: UserOut.from_orm() → UserOut.model_validate() (Pydantic v2)
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+
 from datetime import datetime, timedelta
 from typing import Optional
+
+from config.settings import settings
+from database.database import get_db
+from database.models import User, UserRole
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-
-from database.database import get_db
-from database.models import User, UserRole
-from config.settings import settings
+from sqlalchemy.orm import Session
 
 router = APIRouter()
-pwd_context   = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
@@ -58,11 +59,9 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(
-    data: dict, expires_delta: Optional[timedelta] = None
-) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire    = datetime.utcnow() + (
+    expire = datetime.utcnow() + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire, "type": "access"})
@@ -71,14 +70,14 @@ def create_access_token(
 
 def create_refresh_token(data: dict) -> str:
     to_encode = data.copy()
-    expire    = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db:    Session = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> User:
     exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -118,11 +117,11 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(400, "Email already registered")
 
     user = User(
-        username        = user_data.username,
-        email           = user_data.email,
-        hashed_password = hash_password(user_data.password),
-        full_name       = user_data.full_name,
-        role            = user_data.role,
+        username=user_data.username,
+        email=user_data.email,
+        hashed_password=hash_password(user_data.password),
+        full_name=user_data.full_name,
+        role=user_data.role,
     )
     db.add(user)
     db.commit()
@@ -150,10 +149,10 @@ async def login(
     db.commit()
 
     return Token(
-        access_token  = create_access_token({"sub": user.username}),
-        refresh_token = create_refresh_token({"sub": user.username}),
-        token_type    = "bearer",
-        user          = UserOut.model_validate(user),  # FIX-15
+        access_token=create_access_token({"sub": user.username}),
+        refresh_token=create_refresh_token({"sub": user.username}),
+        token_type="bearer",
+        user=UserOut.model_validate(user),  # FIX-15
     )
 
 
@@ -182,8 +181,8 @@ async def refresh_token_endpoint(
         raise HTTPException(401, "User not found")
 
     return Token(
-        access_token  = create_access_token({"sub": user.username}),
-        refresh_token = create_refresh_token({"sub": user.username}),
-        token_type    = "bearer",
-        user          = UserOut.model_validate(user),  # FIX-15
+        access_token=create_access_token({"sub": user.username}),
+        refresh_token=create_refresh_token({"sub": user.username}),
+        token_type="bearer",
+        user=UserOut.model_validate(user),  # FIX-15
     )

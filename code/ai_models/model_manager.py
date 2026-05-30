@@ -10,29 +10,31 @@ Bug fixes:
   - FIX-8: _classify_drone_type micro_drone threshold corrected (was checking
             relative_size < 0.01 AFTER aspect-ratio branch — unreachable).
 """
-import logging
-import numpy as np
-from typing import List, Dict, Any, Optional
-from pathlib import Path
 
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 from config.settings import settings
 
 logger = logging.getLogger("quantumfence.models")
 
 
 class ModelManager:
-    PERSON_CLASS_ID  = 0
+    PERSON_CLASS_ID = 0
     VEHICLE_CLASS_IDS = {2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 
     def __init__(self):
-        self.yolo_model  = None
+        self.yolo_model = None
         self.drone_model = None
-        self.device      = "cpu"
+        self.device = "cpu"
         self._models_loaded = False
 
     async def load_all_models(self):
         try:
             import torch
+
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
             logger.info(f"Using device: {self.device}")
         except ImportError:
@@ -46,6 +48,7 @@ class ModelManager:
     async def _load_yolo_model(self):
         try:
             from ultralytics import YOLO
+
             model_path = settings.YOLO_MODEL_PATH
             if not Path(model_path).exists():
                 logger.info("Downloading YOLOv8n model...")
@@ -64,6 +67,7 @@ class ModelManager:
     async def _load_drone_model(self):
         try:
             from ultralytics import YOLO
+
             drone_path = settings.DRONE_MODEL_PATH
             if Path(drone_path).exists():
                 self.drone_model = YOLO(drone_path)
@@ -126,12 +130,12 @@ class ModelManager:
             detections = self._parse_yolo_results(results, "drone")
 
             height, width = frame.shape[:2]
-            frame_area    = max(width * height, 1)
-            filtered      = []
+            frame_area = max(width * height, 1)
+            filtered = []
             for det in detections:
-                x, y, w, h  = det["bbox"]
+                x, y, w, h = det["bbox"]
                 relative_size = (w * h) / frame_area
-                relative_y    = y / max(height, 1)
+                relative_y = y / max(height, 1)
                 if relative_size < 0.15 and relative_y < 0.7:
                     det["drone_type"] = self._classify_drone_type(w, h, relative_size)
                     det["altitude_m"] = self._estimate_altitude(relative_size)
@@ -154,24 +158,34 @@ class ModelManager:
                 if result.boxes is None:
                     continue
                 boxes = result.boxes
-                n     = len(boxes)
+                n = len(boxes)
                 for i in range(n):
                     try:
-                        conf   = self._safe_float(boxes.conf[i])
-                        xyxy   = self._safe_xyxy(boxes.xyxy[i])
-                        cls_id = self._safe_int(boxes.cls[i]) if boxes.cls is not None else -1
+                        conf = self._safe_float(boxes.conf[i])
+                        xyxy = self._safe_xyxy(boxes.xyxy[i])
+                        cls_id = (
+                            self._safe_int(boxes.cls[i])
+                            if boxes.cls is not None
+                            else -1
+                        )
 
                         x1, y1, x2, y2 = xyxy
-                        bbox = [round(x1, 2), round(y1, 2),
-                                round(x2 - x1, 2), round(y2 - y1, 2)]
+                        bbox = [
+                            round(x1, 2),
+                            round(y1, 2),
+                            round(x2 - x1, 2),
+                            round(y2 - y1, 2),
+                        ]
 
                         class_name = self.VEHICLE_CLASS_IDS.get(cls_id, default_class)
-                        detections.append({
-                            "confidence": conf,
-                            "bbox":       bbox,
-                            "class":      class_name,
-                            "class_id":   cls_id,
-                        })
+                        detections.append(
+                            {
+                                "confidence": conf,
+                                "bbox": bbox,
+                                "class": class_name,
+                                "class_id": cls_id,
+                            }
+                        )
                     except Exception as e:
                         logger.debug(f"Skipping malformed detection box {i}: {e}")
                         continue
@@ -244,6 +258,7 @@ class ModelManager:
 
 # ── Mock objects (for testing / no-weights environments) ─────────────────────
 
+
 class MockYOLOModel:
     """
     Mock YOLO model — generates occasional detections to simulate activity.
@@ -252,7 +267,7 @@ class MockYOLOModel:
 
     def __init__(self, detection_type: Optional[str] = None):
         self.detection_type = detection_type
-        self._call_count    = 0
+        self._call_count = 0
 
     def __call__(self, frame, **kwargs):
         self._call_count += 1
@@ -263,6 +278,7 @@ class MockYOLOModel:
 
 class MockEmptyResult:
     """Result with no detections."""
+
     boxes = None
 
 
@@ -279,6 +295,7 @@ class MockBoxes:
 
     def __init__(self, frame_shape, detection_type: str):
         import random
+
         h, w = frame_shape[:2]
         x1 = random.uniform(0, w * 0.6)
         y1 = random.uniform(0, h * 0.6)
@@ -286,7 +303,7 @@ class MockBoxes:
         y2 = min(y1 + random.uniform(80, 300), h)
         self.xyxy = [np.array([x1, y1, x2, y2], dtype=np.float32)]
         self.conf = [np.float32(random.uniform(0.65, 0.95))]
-        self.cls  = [np.int64(0)]
+        self.cls = [np.int64(0)]
 
     def __len__(self):
         return 1

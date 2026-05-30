@@ -5,16 +5,17 @@ Bug fixes:
   - FIX-15: model_validate() instead of from_orm()
   - FIX-18: check-point endpoint reads lat/lng from query params correctly
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from typing import List, Optional
-from pydantic import BaseModel
-from datetime import datetime
-import math
 
+import math
+from datetime import datetime
+from typing import List, Optional
+
+from api.routes.auth import User, get_current_user
 from database.database import get_db
 from database.models import Geofence
-from api.routes.auth import get_current_user, User
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -22,7 +23,7 @@ router = APIRouter()
 class GeofenceCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    coordinates: list               # [[lng, lat], ...] GeoJSON convention
+    coordinates: list  # [[lng, lat], ...] GeoJSON convention
     fence_type: str = "polygon"
     center_lat: Optional[float] = None
     center_lng: Optional[float] = None
@@ -143,8 +144,9 @@ async def check_point_in_geofence(
         raise HTTPException(404, "Geofence not found")
 
     if gf.fence_type == "circle" and gf.center_lat and gf.center_lng:
-        inside = _point_in_circle(lat, lng, gf.center_lat, gf.center_lng,
-                                  gf.radius_meters or 100.0)
+        inside = _point_in_circle(
+            lat, lng, gf.center_lat, gf.center_lng, gf.radius_meters or 100.0
+        )
     else:
         inside = _point_in_polygon(lat, lng, gf.coordinates or [])
 
@@ -152,6 +154,7 @@ async def check_point_in_geofence(
 
 
 # ─── Geometry helpers (GeoJSON [lng, lat] convention) ────────────────────────
+
 
 def _point_in_polygon(lat: float, lng: float, coords: list) -> bool:
     """
@@ -162,8 +165,8 @@ def _point_in_polygon(lat: float, lng: float, coords: list) -> bool:
     """
     if not coords or len(coords) < 3:
         return False
-    x, y   = lng, lat
-    n      = len(coords)
+    x, y = lng, lat
+    n = len(coords)
     inside = False
     p1x, p1y = float(coords[0][0]), float(coords[0][1])
     for i in range(1, n + 1):
@@ -180,15 +183,20 @@ def _point_in_polygon(lat: float, lng: float, coords: list) -> bool:
 
 
 def _point_in_circle(
-    lat: float, lng: float,
-    center_lat: float, center_lng: float,
+    lat: float,
+    lng: float,
+    center_lat: float,
+    center_lng: float,
     radius_m: float,
 ) -> bool:
-    R    = 6_371_000
+    R = 6_371_000
     phi1 = math.radians(lat)
     phi2 = math.radians(center_lat)
     dphi = math.radians(center_lat - lat)
     dlam = math.radians(center_lng - lng)
-    a    = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    a = (
+        math.sin(dphi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    )
     dist = R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return dist <= radius_m

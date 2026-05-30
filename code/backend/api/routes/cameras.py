@@ -5,20 +5,28 @@ Bug fixes:
   - FIX-16: delete route correctly awaits stop_camera via background task
   - FIX-17: enable/disable routes update DB status synchronously before returning
 """
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
-from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
-from typing import List, Optional
-from pydantic import BaseModel
+
+import os
 from datetime import datetime
 from pathlib import Path
-import os
+from typing import List, Optional
 
-from database.database import get_db
-from database.models import Camera, CameraType, CameraStatus, Alert, AlertStatus, Detection
-from api.routes.auth import get_current_user, User
+from api.routes.auth import User, get_current_user
 from api.websocket import manager
 from config.settings import settings
+from database.database import get_db
+from database.models import (
+    Alert,
+    AlertStatus,
+    Camera,
+    CameraStatus,
+    CameraType,
+    Detection,
+)
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -135,9 +143,9 @@ async def create_camera(
     ds = _get_detection_service(request)
     if ds and camera.is_active:
         config = {
-            "detect_persons":  camera.detect_persons,
+            "detect_persons": camera.detect_persons,
             "detect_vehicles": camera.detect_vehicles,
-            "detect_drones":   camera.detect_drones,
+            "detect_drones": camera.detect_drones,
         }
         background_tasks.add_task(
             ds.start_camera,
@@ -217,16 +225,16 @@ async def enable_camera(
 
     # FIX-17: update DB status immediately (not just via background task)
     cam.is_active = True
-    cam.status    = CameraStatus.INITIALIZING
+    cam.status = CameraStatus.INITIALIZING
     db.commit()
     db.refresh(cam)
 
     ds = _get_detection_service(request)
     if ds:
         config = {
-            "detect_persons":  cam.detect_persons,
+            "detect_persons": cam.detect_persons,
             "detect_vehicles": cam.detect_vehicles,
-            "detect_drones":   cam.detect_drones,
+            "detect_drones": cam.detect_drones,
         }
         background_tasks.add_task(
             ds.start_camera, cam.id, cam.stream_url or "simulated", config
@@ -251,7 +259,7 @@ async def disable_camera(
 
     # FIX-17: update DB status immediately
     cam.is_active = False
-    cam.status    = CameraStatus.DISABLED
+    cam.status = CameraStatus.DISABLED
     db.commit()
 
     ds = _get_detection_service(request)
@@ -276,7 +284,7 @@ async def get_camera_snapshot(
 
     snap_dir = Path(settings.SNAPSHOTS_DIR)
     if snap_dir.exists():
-        pattern   = f"cam{camera_id:02d}_*.jpg"
+        pattern = f"cam{camera_id:02d}_*.jpg"
         snapshots = sorted(snap_dir.glob(pattern), key=os.path.getmtime, reverse=True)
         if snapshots:
             return FileResponse(str(snapshots[0]), media_type="image/jpeg")
@@ -294,20 +302,26 @@ async def get_camera_stats(
     if not cam:
         raise HTTPException(404, "Camera not found")
 
-    total_detections = db.query(Detection).filter(Detection.camera_id == camera_id).count()
-    total_alerts     = db.query(Alert).filter(Alert.camera_id == camera_id).count()
-    active_alerts    = db.query(Alert).filter(
-        Alert.camera_id == camera_id,
-        Alert.status    == AlertStatus.ACTIVE,
-    ).count()
+    total_detections = (
+        db.query(Detection).filter(Detection.camera_id == camera_id).count()
+    )
+    total_alerts = db.query(Alert).filter(Alert.camera_id == camera_id).count()
+    active_alerts = (
+        db.query(Alert)
+        .filter(
+            Alert.camera_id == camera_id,
+            Alert.status == AlertStatus.ACTIVE,
+        )
+        .count()
+    )
 
     return {
-        "camera_id":         camera_id,
-        "name":              cam.name,
-        "status":            cam.status.value if cam.status else "unknown",
-        "total_detections":  total_detections,
-        "total_alerts":      total_alerts,
-        "active_alerts":     active_alerts,
-        "last_seen":         cam.last_seen,
-        "snapshot_url":      f"/api/cameras/{camera_id}/snapshot",
+        "camera_id": camera_id,
+        "name": cam.name,
+        "status": cam.status.value if cam.status else "unknown",
+        "total_detections": total_detections,
+        "total_alerts": total_alerts,
+        "active_alerts": active_alerts,
+        "last_seen": cam.last_seen,
+        "snapshot_url": f"/api/cameras/{camera_id}/snapshot",
     }

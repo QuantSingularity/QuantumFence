@@ -4,15 +4,16 @@ Bug fixes:
   - FIX-15: Pydantic v2 model_config instead of class Config
   - FIX-21: /stats route registered BEFORE /{alert_id} to prevent routing collision
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from typing import List, Optional
-from pydantic import BaseModel
-from datetime import datetime, timedelta
 
+from datetime import datetime, timedelta
+from typing import List, Optional
+
+from api.routes.auth import User, get_current_user
 from database.database import get_db
-from database.models import Alert, AlertType, AlertSeverity, AlertStatus
-from api.routes.auth import get_current_user, User
+from database.models import Alert, AlertSeverity, AlertStatus, AlertType
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -42,13 +43,20 @@ class AlertOut(BaseModel):
 
 class AlertUpdate(BaseModel):
     status: Optional[AlertStatus] = None
-    notes: Optional[str]          = None
+    notes: Optional[str] = None
 
 
 class AlertStats(BaseModel):
-    total: int; active: int; acknowledged: int; resolved: int
-    critical: int; high: int; medium: int; low: int
-    last_24h: int; by_type: dict
+    total: int
+    active: int
+    acknowledged: int
+    resolved: int
+    critical: int
+    high: int
+    medium: int
+    low: int
+    last_24h: int
+    by_type: dict
 
 
 # FIX-21: /stats MUST be declared before /{alert_id}
@@ -58,40 +66,49 @@ async def get_alert_stats(
     current_user: User = Depends(get_current_user),
 ):
     since_24h = datetime.utcnow() - timedelta(hours=24)
-    by_type   = {
+    by_type = {
         at.value: db.query(Alert).filter(Alert.alert_type == at).count()
         for at in AlertType
     }
     return AlertStats(
-        total        = db.query(Alert).count(),
-        active       = db.query(Alert).filter(Alert.status == AlertStatus.ACTIVE).count(),
-        acknowledged = db.query(Alert).filter(Alert.status == AlertStatus.ACKNOWLEDGED).count(),
-        resolved     = db.query(Alert).filter(Alert.status == AlertStatus.RESOLVED).count(),
-        critical     = db.query(Alert).filter(Alert.severity == AlertSeverity.CRITICAL).count(),
-        high         = db.query(Alert).filter(Alert.severity == AlertSeverity.HIGH).count(),
-        medium       = db.query(Alert).filter(Alert.severity == AlertSeverity.MEDIUM).count(),
-        low          = db.query(Alert).filter(Alert.severity == AlertSeverity.LOW).count(),
-        last_24h     = db.query(Alert).filter(Alert.created_at >= since_24h).count(),
-        by_type      = by_type,
+        total=db.query(Alert).count(),
+        active=db.query(Alert).filter(Alert.status == AlertStatus.ACTIVE).count(),
+        acknowledged=db.query(Alert)
+        .filter(Alert.status == AlertStatus.ACKNOWLEDGED)
+        .count(),
+        resolved=db.query(Alert).filter(Alert.status == AlertStatus.RESOLVED).count(),
+        critical=db.query(Alert)
+        .filter(Alert.severity == AlertSeverity.CRITICAL)
+        .count(),
+        high=db.query(Alert).filter(Alert.severity == AlertSeverity.HIGH).count(),
+        medium=db.query(Alert).filter(Alert.severity == AlertSeverity.MEDIUM).count(),
+        low=db.query(Alert).filter(Alert.severity == AlertSeverity.LOW).count(),
+        last_24h=db.query(Alert).filter(Alert.created_at >= since_24h).count(),
+        by_type=by_type,
     )
 
 
 @router.get("/", response_model=List[AlertOut])
 async def list_alerts(
-    skip: int = 0, limit: int = 50,
-    status:     Optional[AlertStatus]   = None,
-    severity:   Optional[AlertSeverity] = None,
-    alert_type: Optional[AlertType]     = None,
-    camera_id:  Optional[int]           = None,
-    hours:      Optional[int]           = Query(None, description="Last N hours"),
+    skip: int = 0,
+    limit: int = 50,
+    status: Optional[AlertStatus] = None,
+    severity: Optional[AlertSeverity] = None,
+    alert_type: Optional[AlertType] = None,
+    camera_id: Optional[int] = None,
+    hours: Optional[int] = Query(None, description="Last N hours"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     q = db.query(Alert)
-    if status:     q = q.filter(Alert.status     == status)
-    if severity:   q = q.filter(Alert.severity   == severity)
-    if alert_type: q = q.filter(Alert.alert_type == alert_type)
-    if camera_id:  q = q.filter(Alert.camera_id  == camera_id)
+    if status:
+        q = q.filter(Alert.status == status)
+    if severity:
+        q = q.filter(Alert.severity == severity)
+    if alert_type:
+        q = q.filter(Alert.alert_type == alert_type)
+    if camera_id:
+        q = q.filter(Alert.camera_id == camera_id)
     if hours:
         q = q.filter(Alert.created_at >= datetime.utcnow() - timedelta(hours=hours))
     return q.order_by(Alert.created_at.desc()).offset(skip).limit(limit).all()
@@ -128,7 +145,8 @@ async def update_alert(
             a.resolved_at = datetime.utcnow()
     if update.notes is not None:
         a.notes = update.notes
-    db.commit(); db.refresh(a)
+    db.commit()
+    db.refresh(a)
     return a
 
 
@@ -141,10 +159,11 @@ async def acknowledge_alert(
     a = db.query(Alert).filter(Alert.id == alert_id).first()
     if not a:
         raise HTTPException(404, "Alert not found")
-    a.status          = AlertStatus.ACKNOWLEDGED
+    a.status = AlertStatus.ACKNOWLEDGED
     a.acknowledged_by = current_user.id
     a.acknowledged_at = datetime.utcnow()
-    db.commit(); db.refresh(a)
+    db.commit()
+    db.refresh(a)
     return a
 
 
@@ -157,9 +176,10 @@ async def resolve_alert(
     a = db.query(Alert).filter(Alert.id == alert_id).first()
     if not a:
         raise HTTPException(404, "Alert not found")
-    a.status      = AlertStatus.RESOLVED
+    a.status = AlertStatus.RESOLVED
     a.resolved_at = datetime.utcnow()
-    db.commit(); db.refresh(a)
+    db.commit()
+    db.refresh(a)
     return a
 
 
@@ -172,4 +192,5 @@ async def delete_alert(
     a = db.query(Alert).filter(Alert.id == alert_id).first()
     if not a:
         raise HTTPException(404, "Alert not found")
-    db.delete(a); db.commit()
+    db.delete(a)
+    db.commit()
