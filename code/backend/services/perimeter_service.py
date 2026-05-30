@@ -8,11 +8,11 @@ Bug fixes:
             [[lng,lat],...] and [[lat,lng],...] storage formats.
   - FIX-14: analyze_approach_vector guarded against empty coords list.
 """
-
 import logging
 import math
+import asyncio
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
 
 logger = logging.getLogger("quantumfence.perimeter")
 
@@ -24,7 +24,7 @@ class PerimeterService:
     """
 
     def __init__(self):
-        self._breach_cooldowns: Dict[str, datetime] = {}
+        self._breach_cooldowns: Dict[str, datetime]       = {}
         self._loitering_tracker: Dict[str, List[datetime]] = {}
         self._cooldown_seconds = 30
 
@@ -43,10 +43,8 @@ class PerimeterService:
 
             if gf.get("fence_type") == "circle":
                 is_inside = self._point_in_circle(
-                    detection_lat,
-                    detection_lng,
-                    gf["center_lat"],
-                    gf["center_lng"],
+                    detection_lat, detection_lng,
+                    gf["center_lat"], gf["center_lng"],
                     gf.get("radius_meters", 100),
                 )
             else:
@@ -58,27 +56,23 @@ class PerimeterService:
             buffer = gf.get("buffer_meters", 10.0)
             if not is_inside and buffer > 0:
                 is_inside = self._is_within_buffer(
-                    detection_lat,
-                    detection_lng,
-                    gf.get("coordinates", []),
-                    buffer,
+                    detection_lat, detection_lng,
+                    gf.get("coordinates", []), buffer,
                 )
 
             if is_inside and gf.get("alert_on_entry", True):
                 key = f"{camera_id}_{gf['id']}_{detection_type}"
                 if not self._is_in_cooldown(key):
-                    breaches.append(
-                        {
-                            "geofence_id": gf["id"],
-                            "geofence_name": gf["name"],
-                            "detection_type": detection_type,
-                            "severity": self._calculate_severity(detection_type, gf),
-                            "camera_id": camera_id,
-                            "lat": detection_lat,
-                            "lng": detection_lng,
-                            "timestamp": datetime.utcnow().isoformat(),
-                        }
-                    )
+                    breaches.append({
+                        "geofence_id":    gf["id"],
+                        "geofence_name":  gf["name"],
+                        "detection_type": detection_type,
+                        "severity":       self._calculate_severity(detection_type, gf),
+                        "camera_id":      camera_id,
+                        "lat":            detection_lat,
+                        "lng":            detection_lng,
+                        "timestamp":      datetime.utcnow().isoformat(),
+                    })
                     self._set_cooldown(key)
 
         return breaches
@@ -117,22 +111,14 @@ class PerimeterService:
     ) -> Dict:
         """FIX-14: Guard against empty fence_coordinates."""
         if len(positions) < 3:
-            return {
-                "approaching": False,
-                "distance_m": None,
-                "rate_m_per_frame": 0.0,
-                "eta_seconds": None,
-                "threat_vector": "insufficient_data",
-            }
+            return {"approaching": False, "distance_m": None,
+                    "rate_m_per_frame": 0.0, "eta_seconds": None,
+                    "threat_vector": "insufficient_data"}
 
         if not fence_coordinates:
-            return {
-                "approaching": False,
-                "distance_m": None,
-                "rate_m_per_frame": 0.0,
-                "eta_seconds": None,
-                "threat_vector": "no_fence",
-            }
+            return {"approaching": False, "distance_m": None,
+                    "rate_m_per_frame": 0.0, "eta_seconds": None,
+                    "threat_vector": "no_fence"}
 
         recent = positions[-5:]
         distances = [
@@ -141,36 +127,30 @@ class PerimeterService:
         ]
 
         if len(distances) < 2:
-            return {
-                "approaching": False,
-                "distance_m": round(distances[-1], 1),
-                "rate_m_per_frame": 0.0,
-                "eta_seconds": None,
-                "threat_vector": "stationary",
-            }
+            return {"approaching": False, "distance_m": round(distances[-1], 1),
+                    "rate_m_per_frame": 0.0, "eta_seconds": None,
+                    "threat_vector": "stationary"}
 
-        delta = distances[-1] - distances[0]
+        delta      = distances[-1] - distances[0]
         approaching = delta < -2.0
-        rate = delta / max(len(distances) - 1, 1)
-        eta = None
+        rate        = delta / max(len(distances) - 1, 1)
+        eta         = None
         if approaching and abs(rate) > 0:
             eta = round(distances[-1] / abs(rate), 0)
 
         return {
-            "approaching": approaching,
-            "distance_m": round(distances[-1], 1),
+            "approaching":      approaching,
+            "distance_m":       round(distances[-1], 1),
             "rate_m_per_frame": round(rate, 2),
-            "eta_seconds": eta,
-            "threat_vector": (
-                "direct" if approaching and distances[-1] < 20 else "peripheral"
-            ),
+            "eta_seconds":      eta,
+            "threat_vector":    "direct" if approaching and distances[-1] < 20 else "peripheral",
         }
 
     def _calculate_severity(self, detection_type: str, geofence: Dict) -> str:
         base = {
-            "drone": "high",
+            "drone":   "high",
             "vehicle": "high",
-            "person": "medium",
+            "person":  "medium",
             "unknown": "medium",
         }.get(detection_type, "medium")
         if detection_type == "drone" and "critical" in geofence.get("name", "").lower():
@@ -178,11 +158,8 @@ class PerimeterService:
         return base
 
     def _point_in_circle(
-        self,
-        lat: float,
-        lng: float,
-        center_lat: float,
-        center_lng: float,
+        self, lat: float, lng: float,
+        center_lat: float, center_lng: float,
         radius_m: float,
     ) -> bool:
         return self._haversine_distance(lat, lng, center_lat, center_lng) <= radius_m
@@ -198,7 +175,7 @@ class PerimeterService:
         # GeoJSON stores [lng, lat] — we need lat/lng for the test
         # detection point: (lat, lng)
         x, y = lng, lat
-        n = len(coords)
+        n    = len(coords)
         inside = False
         # coords[i] = [lng_i, lat_i]
         p1x, p1y = float(coords[0][0]), float(coords[0][1])
@@ -229,21 +206,19 @@ class PerimeterService:
         if not coords:
             return float("inf")
         return min(
-            self._haversine_distance(lat, lng, float(c[1]), float(c[0])) for c in coords
+            self._haversine_distance(lat, lng, float(c[1]), float(c[0]))
+            for c in coords
         )
 
     def _haversine_distance(
         self, lat1: float, lng1: float, lat2: float, lng2: float
     ) -> float:
-        R = 6_371_000  # metres
+        R    = 6_371_000  # metres
         phi1 = math.radians(lat1)
         phi2 = math.radians(lat2)
         dphi = math.radians(lat2 - lat1)
         dlam = math.radians(lng2 - lng1)
-        a = (
-            math.sin(dphi / 2) ** 2
-            + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
-        )
+        a    = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
         return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
     def _is_in_cooldown(self, key: str) -> bool:

@@ -3,17 +3,16 @@ Tests for NotificationService (services/notification_service.py).
 Covers webhook registration, severity filtering, payload construction,
 and error handling — all without real network calls.
 """
-
-from unittest.mock import AsyncMock, MagicMock, patch
-
 import pytest
+import json
+from unittest.mock import AsyncMock, MagicMock, patch, call
+
 from services.notification_service import NotificationService
 
 pytestmark = pytest.mark.unit
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
-
 
 @pytest.fixture
 def svc():
@@ -23,16 +22,14 @@ def svc():
 @pytest.fixture
 def svc_email_enabled(monkeypatch):
     from config.settings import settings
-
-    monkeypatch.setattr(settings, "SMTP_HOST", "smtp.test.com")
-    monkeypatch.setattr(settings, "SMTP_USER", "user@test.com")
+    monkeypatch.setattr(settings, "SMTP_HOST",     "smtp.test.com")
+    monkeypatch.setattr(settings, "SMTP_USER",     "user@test.com")
     monkeypatch.setattr(settings, "SMTP_PASSWORD", "pass")
     monkeypatch.setattr(settings, "ALERT_EMAIL_RECIPIENTS", ["sec@test.com"])
     return NotificationService()
 
 
 # ─── Webhook registration ─────────────────────────────────────────────────────
-
 
 class TestWebhookRegistration:
 
@@ -57,7 +54,6 @@ class TestWebhookRegistration:
 
 # ─── Email enabled check ──────────────────────────────────────────────────────
 
-
 class TestEmailEnabledFlag:
 
     def test_email_disabled_by_default(self, svc):
@@ -69,7 +65,6 @@ class TestEmailEnabledFlag:
 
 # ─── Webhook sending ─────────────────────────────────────────────────────────
 
-
 class TestWebhookSending:
 
     @pytest.mark.asyncio
@@ -79,17 +74,15 @@ class TestWebhookSending:
         mock_resp = MagicMock()
         mock_resp.status = 200
         mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_resp.__aexit__ = AsyncMock(return_value=False)
+        mock_resp.__aexit__  = AsyncMock(return_value=False)
 
         mock_session = MagicMock()
         mock_session.post = MagicMock(return_value=mock_resp)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=False)
+        mock_session.__aexit__  = AsyncMock(return_value=False)
 
-        with patch(
-            "services.notification_service.aiohttp.ClientSession",
-            return_value=mock_session,
-        ):
+        with patch("services.notification_service.aiohttp.ClientSession",
+                   return_value=mock_session):
             await svc._send_webhooks(
                 alert_type="drone_detected",
                 severity="high",
@@ -106,12 +99,12 @@ class TestWebhookSending:
         assert call_kwargs[0][0] == "https://hooks.test.com/alert"
         # Check payload
         payload = call_kwargs[1]["json"]
-        assert payload["system"] == "QuantumFence"
-        assert payload["event"] == "security_alert"
+        assert payload["system"]     == "QuantumFence"
+        assert payload["event"]      == "security_alert"
         assert payload["alert_type"] == "drone_detected"
-        assert payload["severity"] == "high"
-        assert payload["title"] == "Drone Alert"
-        assert "timestamp" in payload
+        assert payload["severity"]   == "high"
+        assert payload["title"]      == "Drone Alert"
+        assert "timestamp"           in payload
 
     @pytest.mark.asyncio
     async def test_webhook_failure_does_not_raise(self, svc):
@@ -120,15 +113,14 @@ class TestWebhookSending:
         mock_session = MagicMock()
         mock_session.post = MagicMock(side_effect=Exception("connection refused"))
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=False)
+        mock_session.__aexit__  = AsyncMock(return_value=False)
 
-        with patch(
-            "services.notification_service.aiohttp.ClientSession",
-            return_value=mock_session,
-        ):
+        with patch("services.notification_service.aiohttp.ClientSession",
+                   return_value=mock_session):
             # Should log error but not re-raise
             await svc._send_webhooks(
-                "person_detected", "medium", "Test", "Desc", "Cam", None, None
+                "person_detected", "medium", "Test", "Desc",
+                "Cam", None, None
             )
 
     @pytest.mark.asyncio
@@ -139,34 +131,27 @@ class TestWebhookSending:
         mock_resp = MagicMock()
         mock_resp.status = 200
         mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_resp.__aexit__ = AsyncMock(return_value=False)
+        mock_resp.__aexit__  = AsyncMock(return_value=False)
 
         mock_session = MagicMock()
         mock_session.post = MagicMock(return_value=mock_resp)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=False)
+        mock_session.__aexit__  = AsyncMock(return_value=False)
 
-        with patch(
-            "services.notification_service.aiohttp.ClientSession",
-            return_value=mock_session,
-        ):
-            await svc._send_webhooks(
-                "drone_detected", "high", "T", "D", "C", None, None
-            )
+        with patch("services.notification_service.aiohttp.ClientSession",
+                   return_value=mock_session):
+            await svc._send_webhooks("drone_detected", "high", "T", "D", "C", None, None)
 
         assert mock_session.post.call_count == 2
 
     @pytest.mark.asyncio
     async def test_no_webhooks_registered_no_post(self, svc):
         with patch("services.notification_service.aiohttp.ClientSession") as mock_cls:
-            await svc._send_webhooks(
-                "person_detected", "low", "T", "D", "C", None, None
-            )
+            await svc._send_webhooks("person_detected", "low", "T", "D", "C", None, None)
         mock_cls.assert_not_called()
 
 
 # ─── notify_alert dispatcher ─────────────────────────────────────────────────
-
 
 class TestNotifyAlertDispatcher:
 
@@ -187,8 +172,8 @@ class TestNotifyAlertDispatcher:
 
     @pytest.mark.asyncio
     async def test_email_only_for_high_and_critical(self, svc_email_enabled):
-        svc_email_enabled._send_email_alert = AsyncMock()
-        svc_email_enabled._send_webhooks = AsyncMock()
+        svc_email_enabled._send_email_alert  = AsyncMock()
+        svc_email_enabled._send_webhooks     = AsyncMock()
 
         for severity in ["low", "medium"]:
             await svc_email_enabled.notify_alert(
@@ -205,7 +190,7 @@ class TestNotifyAlertDispatcher:
     @pytest.mark.asyncio
     async def test_no_tasks_when_no_webhooks_and_email_disabled(self, svc):
         # No webhooks registered + email disabled → no network calls at all
-        svc._send_webhooks = AsyncMock()
+        svc._send_webhooks    = AsyncMock()
         svc._send_email_alert = AsyncMock()
 
         await svc.notify_alert("drone_detected", "critical", "T", "D", "Cam")
@@ -229,11 +214,10 @@ class TestNotifyAlertDispatcher:
         )
 
         call_kwargs = svc._send_webhooks.call_args[1]
-        assert call_kwargs["ai_summary"] == "Likely surveillance drone"
+        assert call_kwargs["ai_summary"]      == "Likely surveillance drone"
 
 
 # ─── HTML email template ─────────────────────────────────────────────────────
-
 
 class TestEmailHTMLTemplate:
     """
@@ -249,7 +233,8 @@ class TestEmailHTMLTemplate:
             captured["subject"] = msg["Subject"]
             captured["payload"] = msg.get_payload()
 
-        with patch("services.notification_service.aiosmtplib.send", new=mock_send):
+        with patch("services.notification_service.aiosmtplib.send",
+                   new=mock_send):
             await svc_email_enabled._send_email_alert(
                 alert_type="person_detected",
                 severity="critical",
@@ -262,8 +247,8 @@ class TestEmailHTMLTemplate:
                 recommended_action="Dispatch patrol.",
             )
 
-        assert "Intruder Alert" in captured.get("subject", "")
-        assert "CRITICAL" in captured.get("subject", "").upper()
+        assert "Intruder Alert"   in captured.get("subject", "")
+        assert "CRITICAL"         in captured.get("subject", "").upper()
 
     @pytest.mark.asyncio
     async def test_email_html_contains_ai_summary(self, svc_email_enabled):
@@ -277,26 +262,24 @@ class TestEmailHTMLTemplate:
 
         with patch("services.notification_service.aiosmtplib.send", new=mock_send):
             await svc_email_enabled._send_email_alert(
-                "drone_detected",
-                "high",
-                "Drone Alert",
-                "Drone sighted.",
-                "Cam 02",
-                None,
-                None,
-                ai_summary="Unauthorized UAV.",
-                recommended_action="Alert police.",
+                "drone_detected", "high", "Drone Alert",
+                "Drone sighted.", "Cam 02", None, None,
+                ai_summary="Unauthorized UAV.", recommended_action="Alert police.",
             )
 
-        body = html_content.get("body", "")
+        import base64
+        raw_body = html_content.get("body", "")
+        # email.mime may return base64-encoded payload — decode if needed
+        try:
+            body = base64.b64decode(raw_body).decode("utf-8")
+        except Exception:
+            body = raw_body
         assert "Unauthorized UAV." in body or "AI Analysis" in body
 
     @pytest.mark.asyncio
     async def test_email_send_exception_does_not_raise(self, svc_email_enabled):
-        with patch(
-            "services.notification_service.aiosmtplib.send",
-            side_effect=Exception("SMTP error"),
-        ):
+        with patch("services.notification_service.aiosmtplib.send",
+                   side_effect=Exception("SMTP error")):
             # Should log and swallow the exception
             await svc_email_enabled._send_email_alert(
                 "person_detected", "high", "T", "D", "Cam", None, None, None, None

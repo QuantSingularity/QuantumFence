@@ -2,16 +2,13 @@
 System-level integration tests: health endpoint, root endpoint,
 CORS headers, static file serving, and end-to-end alert workflow.
 """
-
-from unittest.mock import MagicMock
-
 import pytest
+from unittest.mock import MagicMock
 
 pytestmark = [pytest.mark.api, pytest.mark.integration]
 
 
 # ─── Root / Health endpoints ──────────────────────────────────────────────────
-
 
 class TestRootEndpoint:
 
@@ -20,9 +17,9 @@ class TestRootEndpoint:
         assert res.status_code == 200
 
     def test_root_contains_system_name(self, client):
-        res = client.get("/")
+        res  = client.get("/")
         data = res.json()
-        assert data["system"] == "QuantumFence"
+        assert data["system"]  == "QuantumFence"
         assert data["version"] is not None
 
     def test_root_contains_status_operational(self, client):
@@ -37,21 +34,20 @@ class TestHealthEndpoint:
         assert res.status_code == 200
 
     def test_health_reports_healthy(self, client):
-        res = client.get("/health")
+        res  = client.get("/health")
         data = res.json()
         assert data["status"] == "healthy"
 
     def test_health_contains_components(self, client):
-        res = client.get("/health")
+        res  = client.get("/health")
         data = res.json()
         assert "components" in data
-        assert "database" in data["components"]
+        assert "database"   in data["components"]
 
     def test_health_reports_active_cameras(self, client):
         from main import app
-
         app.state.detection_service.camera_processors = {"1": MagicMock()}
-        res = client.get("/health")
+        res  = client.get("/health")
         data = res.json()
         assert data["components"]["active_cameras"] >= 0
         app.state.detection_service.camera_processors = {}
@@ -59,16 +55,13 @@ class TestHealthEndpoint:
 
 # ─── CORS ────────────────────────────────────────────────────────────────────
 
-
 class TestCORSHeaders:
 
     def test_options_request_returns_cors_headers(self, client):
         res = client.options(
             "/api/cameras",
-            headers={
-                "Origin": "http://localhost:3000",
-                "Access-Control-Request-Method": "GET",
-            },
+            headers={"Origin": "http://localhost:3000",
+                     "Access-Control-Request-Method": "GET"},
         )
         # FastAPI CORSMiddleware should handle OPTIONS
         assert res.status_code in (200, 204)
@@ -84,40 +77,33 @@ class TestCORSHeaders:
 
 # ─── Static file mount ───────────────────────────────────────────────────────
 
-
 class TestStaticFilesMount:
 
     def test_snapshots_endpoint_exists(self, client, tmp_path, monkeypatch):
         """
-        Write a real JPEG into the snapshots directory and verify
-        it's served correctly through the /snapshots static mount.
+        Write a JPEG into the configured snapshots dir and verify
+        the /snapshots static mount serves it. Avoids mutating
+        app.routes (read-only property in Starlette >= 0.21).
         """
-        import cv2
-        import numpy as np
+        import cv2, numpy as np, os
         from config.settings import settings
 
-        monkeypatch.setattr(settings, "SNAPSHOTS_DIR", str(tmp_path))
-
-        # Re-mount static files to point at tmp_path
-        from fastapi.staticfiles import StaticFiles
-        from main import app
-
-        # Remove existing mount if any
-        app.routes = [
-            r for r in app.routes if not (hasattr(r, "path") and r.path == "/snapshots")
-        ]
-        app.mount("/snapshots", StaticFiles(directory=str(tmp_path)), name="snaps_test")
-
+        snap_dir = settings.SNAPSHOTS_DIR
+        os.makedirs(snap_dir, exist_ok=True)
         frame = np.zeros((50, 50, 3), dtype=np.uint8)
-        cv2.imwrite(str(tmp_path / "test.jpg"), frame)
+        snap_path = os.path.join(snap_dir, "test_static.jpg")
+        cv2.imwrite(snap_path, frame)
 
-        res = client.get("/snapshots/test.jpg")
-        assert res.status_code == 200
-        assert "jpeg" in res.headers.get("content-type", "")
+        try:
+            res = client.get("/snapshots/test_static.jpg")
+            assert res.status_code == 200
+            assert "jpeg" in res.headers.get("content-type", "")
+        finally:
+            if os.path.exists(snap_path):
+                os.remove(snap_path)
 
 
 # ─── End-to-end workflow ──────────────────────────────────────────────────────
-
 
 class TestEndToEndAlertWorkflow:
     """
@@ -128,21 +114,16 @@ class TestEndToEndAlertWorkflow:
 
     def test_full_alert_lifecycle(self, client, auth_headers):
         # 1. Create a camera
-        cam_res = client.post(
-            "/api/cameras",
-            json={
-                "name": "E2E Cam",
-                "camera_type": "simulated",
-                "stream_url": "simulated",
-            },
-            headers=auth_headers,
-        )
+        cam_res = client.post("/api/cameras", json={
+            "name": "E2E Cam", "camera_type": "simulated",
+            "stream_url": "simulated",
+        }, headers=auth_headers)
         assert cam_res.status_code == 201
         cam_id = cam_res.json()["id"]
 
         # 2. Verify camera appears in list
         list_res = client.get("/api/cameras", headers=auth_headers)
-        cam_ids = [c["id"] for c in list_res.json()]
+        cam_ids  = [c["id"] for c in list_res.json()]
         assert cam_id in cam_ids
 
         # 3. Verify stats show zero alerts
@@ -162,24 +143,14 @@ class TestEndToEndAlertWorkflow:
         ids2 = [c["id"] for c in list_res2.json()]
         assert cam_id not in ids2
 
-    def test_geofence_to_alert_workflow(
-        self, client, auth_headers, make_camera, make_alert
-    ):
+    def test_geofence_to_alert_workflow(self, client, auth_headers, make_camera, make_alert):
         # 1. Create geofence
-        gf_res = client.post(
-            "/api/geofences",
-            json={
-                "name": "E2E Zone",
-                "coordinates": [
-                    [73.046, 33.686],
-                    [73.050, 33.686],
-                    [73.050, 33.682],
-                    [73.046, 33.682],
-                    [73.046, 33.686],
-                ],
-            },
-            headers=auth_headers,
-        )
+        gf_res = client.post("/api/geofences", json={
+            "name": "E2E Zone",
+            "coordinates": [[73.046, 33.686], [73.050, 33.686],
+                            [73.050, 33.682], [73.046, 33.682],
+                            [73.046, 33.686]],
+        }, headers=auth_headers)
         assert gf_res.status_code == 201
         gf_id = gf_res.json()["id"]
 
@@ -201,13 +172,13 @@ class TestEndToEndAlertWorkflow:
         assert stats_res.json()["total"] >= 1
 
         # 6. Acknowledge
-        ack_res = client.post(
-            f"/api/alerts/{alert.id}/acknowledge", headers=auth_headers
-        )
+        ack_res = client.post(f"/api/alerts/{alert.id}/acknowledge",
+                              headers=auth_headers)
         assert ack_res.json()["status"] == "acknowledged"
 
         # 7. Resolve
-        res_res = client.post(f"/api/alerts/{alert.id}/resolve", headers=auth_headers)
+        res_res = client.post(f"/api/alerts/{alert.id}/resolve",
+                              headers=auth_headers)
         assert res_res.json()["status"] == "resolved"
 
         # 8. Cleanup geofence
@@ -215,7 +186,6 @@ class TestEndToEndAlertWorkflow:
 
 
 # ─── Role-based access control ───────────────────────────────────────────────
-
 
 class TestRoleBasedAccess:
 
@@ -225,17 +195,13 @@ class TestRoleBasedAccess:
         assert res.status_code == 200
 
     def test_operator_can_create_camera(self, client, operator_headers):
-        res = client.post(
-            "/api/cameras", json={"name": "Operator Cam"}, headers=operator_headers
-        )
+        res = client.post("/api/cameras",
+                          json={"name": "Operator Cam"},
+                          headers=operator_headers)
         assert res.status_code == 201
 
     def test_unauthenticated_cannot_access_any_api(self, client):
-        for endpoint in [
-            "/api/cameras",
-            "/api/alerts",
-            "/api/drones",
-            "/api/analytics/overview",
-        ]:
+        for endpoint in ["/api/cameras", "/api/alerts",
+                         "/api/drones", "/api/analytics/overview"]:
             res = client.get(endpoint)
             assert res.status_code == 401, f"Expected 401 for {endpoint}"

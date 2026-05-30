@@ -4,16 +4,15 @@ Bug fixes:
   - FIX-19: DroneOut.from_orm() → model_validate(); Pydantic v2
   - FIX-20: active drones endpoint serializes via model_validate instead of .dict()
 """
-
-from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
+from datetime import datetime, timedelta
 
-from api.routes.auth import User, get_current_user
 from database.database import get_db
 from database.models import DroneDetection, ThreatLevel
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from api.routes.auth import get_current_user, User
 
 router = APIRouter()
 
@@ -46,7 +45,7 @@ async def list_drone_detections(
     current_user: User = Depends(get_current_user),
 ):
     since = datetime.utcnow() - timedelta(hours=hours)
-    q = db.query(DroneDetection).filter(DroneDetection.timestamp >= since)
+    q     = db.query(DroneDetection).filter(DroneDetection.timestamp >= since)
     if camera_id:
         q = q.filter(DroneDetection.camera_id == camera_id)
     return q.order_by(DroneDetection.timestamp.desc()).offset(skip).limit(limit).all()
@@ -58,14 +57,12 @@ async def get_active_drones(
     current_user: User = Depends(get_current_user),
 ):
     """Drones detected in the last 5 minutes."""
-    since = datetime.utcnow() - timedelta(minutes=5)
+    since  = datetime.utcnow() - timedelta(minutes=5)
     drones = db.query(DroneDetection).filter(DroneDetection.timestamp >= since).all()
     # FIX-20: use model_validate for serialization
     return {
         "active_drones": len(drones),
-        "detections": [
-            DroneOut.model_validate(d).model_dump(mode="json") for d in drones
-        ],
+        "detections":    [DroneOut.model_validate(d).model_dump(mode="json") for d in drones],
     }
 
 
@@ -74,20 +71,16 @@ async def drone_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    total = db.query(DroneDetection).count()
-    last_24h = (
-        db.query(DroneDetection)
-        .filter(DroneDetection.timestamp >= datetime.utcnow() - timedelta(hours=24))
-        .count()
-    )
-    authorized = (
-        db.query(DroneDetection).filter(DroneDetection.is_authorized == True).count()
-    )
+    total        = db.query(DroneDetection).count()
+    last_24h     = db.query(DroneDetection).filter(
+        DroneDetection.timestamp >= datetime.utcnow() - timedelta(hours=24)
+    ).count()
+    authorized   = db.query(DroneDetection).filter(DroneDetection.is_authorized == True).count()
     unauthorized = total - authorized
     return {
-        "total_detections": total,
-        "last_24h": last_24h,
-        "authorized": authorized,
-        "unauthorized": unauthorized,
+        "total_detections":  total,
+        "last_24h":          last_24h,
+        "authorized":        authorized,
+        "unauthorized":      unauthorized,
         "threat_percentage": round((unauthorized / max(total, 1)) * 100, 1),
     }

@@ -1,11 +1,9 @@
 """
 QuantumFence - Application Configuration & Settings
 """
-
-import os
-from typing import List, Optional
-
 from pydantic_settings import BaseSettings
+from typing import List, Optional
+import os
 
 
 class Settings(BaseSettings):
@@ -86,17 +84,12 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-
 # FIX: Only create directories at runtime, NOT at import time in tests.
 # This is deferred to application startup in main.py lifespan.
 # (Previously the bare `os.makedirs` calls here crashed test collection
 #  because /tmp paths didn't match monkeypatched settings.)
 def ensure_directories() -> None:
     """Create all required runtime directories. Call from main.py lifespan."""
-    for d in [
-        settings.SNAPSHOTS_DIR,
-        settings.RECORDINGS_DIR,
-        "ai_models/weights",
-        "logs",
-    ]:
+    for d in [settings.SNAPSHOTS_DIR, settings.RECORDINGS_DIR,
+              "ai_models/weights", "logs"]:
         os.makedirs(d, exist_ok=True)

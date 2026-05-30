@@ -4,30 +4,29 @@ Bug fixes:
   - FIX-11: Calls ensure_directories() at lifespan startup, not import time
   - FIX-22: Added __init__.py imports check; sys.path set before any local imports
 """
-
-import os
 import sys
+import os
 
 # ── Ensure code/ and code/backend/ are both on the Python path ───────────────
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-_CODE_DIR = os.path.dirname(_BACKEND_DIR)
+_CODE_DIR    = os.path.dirname(_BACKEND_DIR)
 for _p in (_CODE_DIR, _BACKEND_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import logging
-from contextlib import asynccontextmanager
-
-import uvicorn
-from api.routes import alerts, analytics, auth, cameras, drones, geofences
-from api.websocket import manager
-from config.settings import ensure_directories, settings
-from database.database import Base, SessionLocal, engine
-from database.models import Camera, CameraStatus
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
+import uvicorn
+import logging
+
+from config.settings import settings, ensure_directories
+from database.database import engine, Base, SessionLocal
+from database.models import Camera, CameraStatus
+from api.routes import auth, cameras, alerts, drones, analytics, geofences
+from api.websocket import manager
 from services.detection_service import DetectionService
 
 logging.basicConfig(
@@ -51,14 +50,14 @@ async def _start_active_cameras(ds: DetectionService) -> None:
         logger.info(f"Auto-starting {len(active)} active camera(s)...")
         for cam in active:
             config = {
-                "detect_persons": cam.detect_persons,
+                "detect_persons":  cam.detect_persons,
                 "detect_vehicles": cam.detect_vehicles,
-                "detect_drones": cam.detect_drones,
+                "detect_drones":   cam.detect_drones,
             }
             await ds.start_camera(
-                camera_id=cam.id,
-                stream_url=cam.stream_url or "simulated",
-                config=config,
+                camera_id  = cam.id,
+                stream_url = cam.stream_url or "simulated",
+                config     = config,
             )
     except Exception as e:
         logger.error(f"Error auto-starting cameras: {e}")
@@ -95,21 +94,21 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="QuantumFence",
-    description="Quantum-Accelerated Perimeter Defense AI System",
-    version="1.0.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    lifespan=lifespan,
+    title       = "QuantumFence",
+    description = "Quantum-Accelerated Perimeter Defense AI System",
+    version     = "1.0.0",
+    docs_url    = "/api/docs",
+    redoc_url   = "/api/redoc",
+    lifespan    = lifespan,
 )
 
 # ─── Middleware ───────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins     = settings.ALLOWED_ORIGINS,
+    allow_credentials = True,
+    allow_methods     = ["*"],
+    allow_headers     = ["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
@@ -122,12 +121,12 @@ app.mount(
 )
 
 # ─── API Routers ──────────────────────────────────────────────────────────────
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(cameras.router, prefix="/api/cameras", tags=["Cameras"])
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
-app.include_router(drones.router, prefix="/api/drones", tags=["Drone Detection"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
-app.include_router(geofences.router, prefix="/api/geofences", tags=["Geofences"])
+app.include_router(auth.router,       prefix="/api/auth",       tags=["Authentication"])
+app.include_router(cameras.router,    prefix="/api/cameras",    tags=["Cameras"])
+app.include_router(alerts.router,     prefix="/api/alerts",     tags=["Alerts"])
+app.include_router(drones.router,     prefix="/api/drones",     tags=["Drone Detection"])
+app.include_router(analytics.router,  prefix="/api/analytics",  tags=["Analytics"])
+app.include_router(geofences.router,  prefix="/api/geofences",  tags=["Geofences"])
 
 
 # ─── WebSocket ────────────────────────────────────────────────────────────────
@@ -136,7 +135,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await manager.connect(websocket, client_id)
     try:
         while True:
-            data = await websocket.receive_json()
+            data       = await websocket.receive_json()
             event_type = data.get("type", "ping")
 
             if event_type == "ping":
@@ -168,9 +167,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 @app.get("/")
 async def root():
     return {
-        "system": "QuantumFence",
-        "version": "1.0.0",
-        "status": "operational",
+        "system":      "QuantumFence",
+        "version":     "1.0.0",
+        "status":      "operational",
         "description": "Quantum-Accelerated Perimeter Defense AI System",
     }
 
@@ -179,11 +178,11 @@ async def root():
 async def health():
     ds = getattr(app.state, "detection_service", None)
     return {
-        "status": "healthy",
+        "status":  "healthy",
         "version": "1.0.0",
         "components": {
-            "database": "connected",
-            "ai_models": "loaded" if (ds and ds.model_manager) else "unavailable",
+            "database":       "connected",
+            "ai_models":      "loaded" if (ds and ds.model_manager) else "unavailable",
             "detection_service": "running" if ds else "stopped",
             "active_cameras": len(ds.camera_processors) if ds else 0,
         },
@@ -193,8 +192,8 @@ async def health():
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        reload=settings.DEBUG,
-        log_level="info",
+        host      = settings.HOST,
+        port      = settings.PORT,
+        reload    = settings.DEBUG,
+        log_level = "info",
     )
