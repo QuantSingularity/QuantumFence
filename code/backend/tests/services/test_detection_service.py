@@ -282,10 +282,31 @@ class TestAlertCreation:
 
     @pytest.fixture
     def svc_with_db(self, db_session):
+        """
+        Service whose db_session_factory returns a NON-CLOSING wrapper
+        so the detection service's try/finally db.close() does not
+        close the underlying test session/connection.
+        """
+
+        class _NoCloseSession:
+            """Delegate all attribute access to the real session but no-op close()."""
+
+            def __init__(self, real):
+                self._real = real
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+            def close(self):
+                pass  # no-op — let the test fixture manage teardown
+
+            def rollback(self):
+                pass  # no-op to avoid aborting the test transaction
+
         s = DetectionService()
         s.model_manager = MagicMock()
         s.ai_analysis = None
-        s.db_session_factory = lambda: db_session
+        s.db_session_factory = lambda: _NoCloseSession(db_session)
         return s
 
     @pytest.mark.asyncio
@@ -456,8 +477,21 @@ class TestDetectionServiceDBHelpers:
 
     @pytest.fixture
     def svc(self, db_session):
+        class _NoCloseSession:
+            def __init__(self, real):
+                self._real = real
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+            def close(self):
+                pass
+
+            def rollback(self):
+                pass
+
         s = DetectionService()
-        s.db_session_factory = lambda: db_session
+        s.db_session_factory = lambda: _NoCloseSession(db_session)
         return s
 
     def test_set_camera_status_updates_db(self, svc, db_session, make_camera):
@@ -477,12 +511,14 @@ class TestDetectionServiceDBHelpers:
         assert cam.status == CameraStatus.DISABLED
 
     def test_touch_camera_updates_last_seen(self, svc, db_session, make_camera):
+        from database.models import Camera
+
         cam = make_camera()
-        assert cam.last_seen is None or True  # may be None initially
+        cam_id = cam.id
         ts = datetime(2024, 1, 1, 12, 0, 0)
-        svc._touch_camera(cam.id, ts)
-        db_session.refresh(cam)
-        assert cam.last_seen is not None
+        svc._touch_camera(cam_id, ts)
+        updated = db_session.query(Camera).filter(Camera.id == cam_id).first()
+        assert updated.last_seen is not None
 
     def test_set_status_nonexistent_camera_is_safe(self, svc):
         # Should not raise for unknown ID

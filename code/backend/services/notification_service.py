@@ -18,6 +18,18 @@ from typing import List, Optional
 
 from config.settings import settings
 
+# Module-level optional imports — tests patch these as module attributes.
+# Both are gracefully absent at runtime if not installed.
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None  # type: ignore
+
+try:
+    import aiosmtplib
+except ImportError:
+    aiosmtplib = None  # type: ignore
+
 logger = logging.getLogger("quantumfence.notifications")
 
 
@@ -56,27 +68,27 @@ class NotificationService:
         if self.email_enabled and severity in ("high", "critical"):
             tasks.append(
                 self._send_email_alert(
-                    alert_type,
-                    severity,
-                    title,
-                    description,
-                    camera_name,
-                    location,
-                    snapshot_path,
-                    ai_summary,
-                    recommended_action,
+                    alert_type=alert_type,
+                    severity=severity,
+                    title=title,
+                    description=description,
+                    camera_name=camera_name,
+                    location=location,
+                    snapshot_path=snapshot_path,
+                    ai_summary=ai_summary,
+                    recommended_action=recommended_action,
                 )
             )
         if self._webhook_urls:
             tasks.append(
                 self._send_webhooks(
-                    alert_type,
-                    severity,
-                    title,
-                    description,
-                    camera_name,
-                    location,
-                    ai_summary,
+                    alert_type=alert_type,
+                    severity=severity,
+                    title=title,
+                    description=description,
+                    camera_name=camera_name,
+                    location=location,
+                    ai_summary=ai_summary,
                 )
             )
         if tasks:
@@ -94,10 +106,7 @@ class NotificationService:
         ai_summary: Optional[str],
         recommended_action: Optional[str],
     ):
-        # FIX-14: lazy import
-        try:
-            import aiosmtplib
-        except ImportError:
+        if aiosmtplib is None:
             logger.warning("aiosmtplib not installed — email notifications disabled")
             return
 
@@ -207,10 +216,7 @@ body{{font-family:'Segoe UI',sans-serif;background:#0a0a1a;color:#e0e0e0;margin:
         if not self._webhook_urls:
             return
 
-        # FIX-15: lazy import
-        try:
-            import aiohttp
-        except ImportError:
+        if aiohttp is None:
             logger.warning("aiohttp not installed — webhook notifications disabled")
             return
 

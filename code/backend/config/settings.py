@@ -77,10 +77,11 @@ class Settings(BaseSettings):
     STREAM_RECONNECT_ATTEMPTS: int = 3
     STREAM_BUFFER_SIZE: int = 5
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": True,
+    }
 
 
 settings = Settings()

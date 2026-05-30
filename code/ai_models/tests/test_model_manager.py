@@ -134,8 +134,8 @@ class TestParseYoloResults:
 
         dets = manager._parse_yolo_results([mock_result], "person")
         assert len(dets) == 2
-        confs = {d["confidence"] for d in dets}
-        assert 0.91 in {pytest.approx(c, abs=1e-3) for c in confs}
+        confs = [d["confidence"] for d in dets]
+        assert any(abs(c - 0.91) < 1e-3 for c in confs)
 
     def test_bbox_values_rounded(self, manager):
         box = MagicMock()
@@ -171,7 +171,7 @@ class TestDetectPersons:
     def test_none_model_returns_empty(self, blank_720p):
         m = ModelManager()
         m.yolo_model = None
-        assert manager.detect_persons if True else None  # just check attr
+        assert hasattr(m, "detect_persons")  # verify method exists
         result = m.detect_persons(blank_720p)
         assert result == []
 

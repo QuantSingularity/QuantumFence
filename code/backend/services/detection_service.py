@@ -18,8 +18,13 @@ from typing import Dict, Optional
 
 import cv2
 import numpy as np
+
+# Module-level imports so tests can patch them with patch("services.detection_service.X")
+from ai_models.model_manager import ModelManager
 from api.websocket import manager
 from config.settings import settings
+from database.database import SessionLocal
+from services.ai_analysis_service import AIAnalysisService
 
 logger = logging.getLogger("quantumfence.detection")
 
@@ -125,10 +130,6 @@ class DetectionService:
     async def initialize(self):
         """Load AI models and wire up DB session factory."""
         try:
-            from ai_models.model_manager import ModelManager
-            from database.database import SessionLocal
-            from services.ai_analysis_service import AIAnalysisService
-
             self.model_manager = ModelManager()
             await self.model_manager.load_all_models()
             self.ai_analysis = AIAnalysisService()

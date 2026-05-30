@@ -44,6 +44,11 @@ class AIAnalysisService:
                 self.enabled = False
         return self._client
 
+    @client.setter
+    def client(self, value):
+        """Allow tests to inject a mock client directly."""
+        self._client = value
+
     # ── Public analyse methods (all async) ──────────────────────────────────
 
     async def analyze_threat(

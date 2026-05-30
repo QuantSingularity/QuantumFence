@@ -153,7 +153,7 @@ def make_camera(db_session):
         **kwargs,
     ):
         _counter[0] += 1
-        cam = Camera(
+        defaults = dict(
             name=name or f"Test Camera {_counter[0]}",
             camera_type=camera_type,
             stream_url=stream_url,
@@ -171,8 +171,10 @@ def make_camera(db_session):
             altitude_meters=5.0,
             geofence_id=geofence_id,
             is_active=True,
-            **kwargs,
         )
+        # kwargs override defaults (e.g. make_camera(fps=30))
+        defaults.update(kwargs)
+        cam = Camera(**defaults)
         db_session.add(cam)
         db_session.commit()
         db_session.refresh(cam)
