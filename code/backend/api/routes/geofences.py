@@ -1,9 +1,5 @@
 """
 QuantumFence - Geofence Management Routes
-Bug fixes:
-  - FIX-13: _point_in_polygon unified with perimeter_service — coords are [lng,lat]
-  - FIX-15: model_validate() instead of from_orm()
-  - FIX-18: check-point endpoint reads lat/lng from query params correctly
 """
 
 import math

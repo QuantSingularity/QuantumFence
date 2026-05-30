@@ -1,12 +1,5 @@
 """
 QuantumFence - Perimeter Intelligence Service
-
-Bug fixes:
-  - FIX-12: _distance_to_polygon was passing coord[1], coord[0] (lng,lat) to
-            haversine — flipped to coord[1]=lat, coord[0]=lng correctly.
-  - FIX-13: _point_in_polygon coordinate access made robust for both
-            [[lng,lat],...] and [[lat,lng],...] storage formats.
-  - FIX-14: analyze_approach_vector guarded against empty coords list.
 """
 
 import logging

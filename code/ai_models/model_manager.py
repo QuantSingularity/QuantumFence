@@ -1,14 +1,6 @@
 """
 QuantumFence - AI Model Manager
 Manages YOLOv8-based detection models for persons, vehicles, and drones.
-
-Bug fixes:
-  - FIX-6: MockBoxes.xyxy stores plain np.arrays; _parse_yolo_results now calls
-            .tolist() only on real tensors and uses .item() for scalars safely.
-  - FIX-7: MockYOLOModel(detection_type=None) now returns empty-boxes result
-            rather than passing None into MockResult (avoided AttributeError).
-  - FIX-8: _classify_drone_type micro_drone threshold corrected (was checking
-            relative_size < 0.01 AFTER aspect-ratio branch — unreachable).
 """
 
 import logging

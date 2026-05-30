@@ -1,13 +1,6 @@
 """
 QuantumFence - Detection Service
 Orchestrates real-time video processing and AI-powered threat detection.
-
-Bug fixes applied:
-  - FIX-1: Drone alerts no longer double-created (drone excluded from _create_alert)
-  - FIX-2: DB sessions use try/finally to prevent leaks
-  - FIX-3: _touch_camera throttled (once per 30 s per camera) to avoid write storm
-  - FIX-4: alert.title captured before db.close() to avoid detached instance access
-  - FIX-5: asyncio.to_thread wraps synchronous anthropic client call
 """
 
 import asyncio

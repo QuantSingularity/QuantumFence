@@ -1,8 +1,5 @@
 """
 QuantumFence - Analytics Routes
-Bug fixes:
-  - FIX-23: CameraStatus.ONLINE enum member used (was string "online")
-  - FIX-24: system_health capped at 100.0
 """
 
 from datetime import datetime, timedelta

@@ -1,14 +1,6 @@
 """
 QuantumFence - AI Threat Analysis Service
 Uses Anthropic Claude API to analyze detections and generate threat assessments.
-
-Bug fixes:
-  - FIX-9:  anthropic.Anthropic() constructed lazily so import-time failure
-            (no API key, no package) doesn't crash the entire server.
-  - FIX-10: _parse_analysis_response strips both ```json and ``` fence variants.
-  - FIX-11: All three public analyze_* methods are proper async; the sync
-            Anthropic client call is offloaded to asyncio.to_thread so it
-            never blocks the event loop.
 """
 
 import json

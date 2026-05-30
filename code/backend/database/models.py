@@ -1,17 +1,5 @@
 """
 QuantumFence - SQLAlchemy Database Models
-Bug fixes:
-  - FIX-32: Geofence.coordinates column made nullable=True to match optional
-            creation path (coordinates validated at route level instead).
-  - FIX-33: Alert.acknowledged_by FK references users.id — added explicit
-            relationship to avoid DetachedInstanceError.
-  - FIX-34: All Enum columns use native_enum=False for SQLite compatibility
-            (SQLite has no native ENUM type; without this flag schema
-             introspection fails on some SQLAlchemy versions).
-  - FIX-35: Detection.timestamp server_default now uses func.now() like
-            other models (was missing).
-  - FIX-36: SystemLog.metadata renamed to log_metadata to avoid collision
-            with SQLAlchemy's reserved InstrumentedAttribute 'metadata'.
 """
 
 import enum

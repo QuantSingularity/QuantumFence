@@ -1,8 +1,5 @@
 """
 QuantumFence - Alert Management Routes
-Bug fixes:
-  - FIX-15: Pydantic v2 model_config instead of class Config
-  - FIX-21: /stats route registered BEFORE /{alert_id} to prevent routing collision
 """
 
 from datetime import datetime, timedelta

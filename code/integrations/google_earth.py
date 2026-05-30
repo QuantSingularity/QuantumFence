@@ -1,9 +1,5 @@
 """
 QuantumFence - Google Earth & Maps Integration
-Bug fixes:
-  - FIX-25: KML color conversion fixed — hex color #RRGGBB → KML AABBGGRR
-  - FIX-26: generate_static_map_url builds markers as list (not dict) for urlencode
-  - FIX-27: estimate_detection_location protected against division by zero
 """
 
 import logging

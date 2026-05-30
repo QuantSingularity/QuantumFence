@@ -1,9 +1,5 @@
 """
 QuantumFence - Camera Management Routes
-Bug fixes:
-  - FIX-15: model_validate() instead of from_orm()
-  - FIX-16: delete route correctly awaits stop_camera via background task
-  - FIX-17: enable/disable routes update DB status synchronously before returning
 """
 
 import os

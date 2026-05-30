@@ -1,18 +1,6 @@
 """
 QuantumFence - Drone Detection Module
 Advanced UAV/drone detection with trajectory analysis and threat scoring.
-
-Bug fixes:
-  - FIX-28: DroneTrack.is_approaching used list comprehension on deque positions
-            but checked len(p) >= 4 which is always True for 4-tuples — logic
-            simplified and made explicit.
-  - FIX-29: detect_swarm() direction_variance calculation — np.var on angles
-            wraps around 360°, giving false "no swarm" for N/NW drones.
-            Use circular variance instead.
-  - FIX-30: _find_nearest_track max_dist parameter was float but default
-            matched pixel distances — renamed and documented clearly.
-  - FIX-31: DroneTrack positions deque stores 4-tuples (cx,cy,w,h); to_dict
-            was trying to access non-existent index on empty deque.
 """
 
 import logging

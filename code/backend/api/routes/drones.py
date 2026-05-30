@@ -1,8 +1,5 @@
 """
 QuantumFence - Drone Detection Routes
-Bug fixes:
-  - FIX-19: DroneOut.from_orm() → model_validate(); Pydantic v2
-  - FIX-20: active drones endpoint serializes via model_validate instead of .dict()
 """
 
 from datetime import datetime, timedelta

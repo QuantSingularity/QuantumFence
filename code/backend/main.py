@@ -1,8 +1,5 @@
 """
 QuantumFence - Main FastAPI Application
-Bug fixes:
-  - FIX-11: Calls ensure_directories() at lifespan startup, not import time
-  - FIX-22: Added __init__.py imports check; sys.path set before any local imports
 """
 
 import os

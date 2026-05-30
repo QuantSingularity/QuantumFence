@@ -1,10 +1,5 @@
 """
 QuantumFence - Notification Service
-
-Bug fixes:
-  - FIX-14: aiosmtplib imported lazily inside _send_email_alert so the module
-            can be imported even when aiosmtplib is not installed.
-  - FIX-15: aiohttp also imported lazily; avoids startup crash when absent.
 """
 
 import asyncio
