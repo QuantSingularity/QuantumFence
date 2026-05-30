@@ -12,7 +12,6 @@ Path resolution:
 import os
 import sys
 
-
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))  # code/integrations/tests
 _INTEG_DIR = os.path.dirname(_THIS_DIR)  # code/integrations
 _CODE_DIR = os.path.dirname(_INTEG_DIR)  # code

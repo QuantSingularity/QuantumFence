@@ -1,7 +1,5 @@
 """
 QuantumFence - Authentication Routes
-Bug fixes:
-  - FIX-15: UserOut.from_orm() → UserOut.model_validate() (Pydantic v2)
 """
 
 from datetime import datetime, timedelta
@@ -18,7 +16,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__truncate_error=False,  # passlib >= 1.7.4 on Py3.11 raises ValueError otherwise
+)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
